@@ -1,0 +1,21 @@
+{
+    "os": "Windows-10-10.0.22000-SP0",
+    "python": "3.9.7",
+    "heartbeatAt": "2022-01-28T21:31:19.011267",
+    "startedAt": "2022-01-28T21:31:17.210754",
+    "docker": null,
+    "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+    "gpu_count": 1,
+    "cpu_count": 16,
+    "cuda": null,
+    "args": [
+        "-f",
+        "C:\\Users\\brand\\AppData\\Roaming\\jupyter\\runtime\\kernel-b49f1846-00d6-4239-b2f1-66c70f9fc7c7.json"
+    ],
+    "state": "running",
+    "program": "Documents/Projects/XLdefgen/mt5_de_en_translation_1_26.ipynb",
+    "root": "C:\\Users\\brand",
+    "host": "BrandonG15",
+    "username": "brand",
+    "executable": "C:\\Users\\brand\\anaconda3\\envs\\XLdefgen\\python.exe"
+}

@@ -1,0 +1,103 @@
+{
+  "builder_name": "wmt16",
+  "citation": "\n@InProceedings{bojar-EtAl:2016:WMT1,\n  author    = {Bojar, Ond\u000b{r}ej  and  Chatterjee, Rajen  and  Federmann, Christian  and  Graham, Yvette  and  Haddow, Barry  and  Huck, Matthias  and  Jimeno Yepes, Antonio  and  Koehn, Philipp  and  Logacheva, Varvara  and  Monz, Christof  and  Negri, Matteo  and  Neveol, Aurelie  and  Neves, Mariana  and  Popel, Martin  and  Post, Matt  and  Rubino, Raphael  and  Scarton, Carolina  and  Specia, Lucia  and  Turchi, Marco  and  Verspoor, Karin  and  Zampieri, Marcos},\n  title     = {Findings of the 2016 Conference on Machine Translation},\n  booktitle = {Proceedings of the First Conference on Machine Translation},\n  month     = {August},\n  year      = {2016},\n  address   = {Berlin, Germany},\n  publisher = {Association for Computational Linguistics},\n  pages     = {131--198},\n  url       = {http://www.aclweb.org/anthology/W/W16/W16-2301}\n}\n",
+  "config_name": "de-en",
+  "dataset_size": 1374361961,
+  "description": "Translate dataset based on the data from statmt.org.\n\nVersions exists for the different years using a combination of multiple data\nsources. The base `wmt_translate` allows you to create your own config to choose\nyour own data/language pair by creating a custom `datasets.translate.wmt.WmtConfig`.\n\n```\nconfig = datasets.wmt.WmtConfig(\n    version=\"0.0.1\",\n    language_pair=(\"fr\", \"de\"),\n    subsets={\n        datasets.Split.TRAIN: [\"commoncrawl_frde\"],\n        datasets.Split.VALIDATION: [\"euelections_dev2019\"],\n    },\n)\nbuilder = datasets.builder(\"wmt_translate\", config=config)\n```\n\n",
+  "download_checksums": {
+    "https://huggingface.co/datasets/wmt/wmt13/resolve/main-zip/training-parallel-europarl-v7.zip": {
+      "num_bytes": 658092427,
+      "checksum": "5b2d8b32c2396da739b4e731871c597fcc6e75729becd74619d0712eecf7770e"
+    },
+    "https://huggingface.co/datasets/wmt/wmt13/resolve/main-zip/training-parallel-commoncrawl.zip": {
+      "num_bytes": 918734483,
+      "checksum": "5ffe980072ea29adfd84568d099bea366d9f72772b988e670794ae851b4e5627"
+    },
+    "https://huggingface.co/datasets/wmt/wmt16/resolve/main-zip/translation-task/training-parallel-nc-v11.zip": {
+      "num_bytes": 75185203,
+      "checksum": "8e8b063120c37511a6207b7a4bda9a981efc7df7e1e3c319cfaba774a762af34"
+    },
+    "https://huggingface.co/datasets/wmt/wmt19/resolve/main-zip/translation-task/dev.zip": {
+      "num_bytes": 38714274,
+      "checksum": "d796e363740fdc4261aa6f5a3d2f8223e3adaee7d737b7724863325b8956dfd1"
+    }
+  },
+  "download_size": 1690726387,
+  "features": {
+    "translation": {
+      "languages": [
+        "de",
+        "en"
+      ],
+      "id": null,
+      "_type": "Translation"
+    },
+    "input_ids": {
+      "feature": {
+        "dtype": "int32",
+        "id": null,
+        "_type": "Value"
+      },
+      "length": -1,
+      "id": null,
+      "_type": "Sequence"
+    },
+    "attention_mask": {
+      "feature": {
+        "dtype": "int8",
+        "id": null,
+        "_type": "Value"
+      },
+      "length": -1,
+      "id": null,
+      "_type": "Sequence"
+    },
+    "labels": {
+      "feature": {
+        "dtype": "int64",
+        "id": null,
+        "_type": "Value"
+      },
+      "length": -1,
+      "id": null,
+      "_type": "Sequence"
+    }
+  },
+  "homepage": "http://www.statmt.org/wmt16/translation-task.html",
+  "license": "",
+  "post_processed": null,
+  "post_processing_size": null,
+  "size_in_bytes": 3065088348,
+  "splits": {
+    "train": {
+      "name": "train",
+      "num_bytes": 1373103456,
+      "num_examples": 4548885,
+      "dataset_name": "wmt16"
+    },
+    "validation": {
+      "name": "validation",
+      "num_bytes": 522989,
+      "num_examples": 2169,
+      "dataset_name": "wmt16"
+    },
+    "test": {
+      "name": "test",
+      "num_bytes": 735516,
+      "num_examples": 2999,
+      "dataset_name": "wmt16"
+    }
+  },
+  "supervised_keys": {
+    "input": "de",
+    "output": "en"
+  },
+  "task_templates": null,
+  "version": {
+    "version_str": "1.0.0",
+    "description": null,
+    "major": 1,
+    "minor": 0,
+    "patch": 0
+  }
+}
