@@ -1,9 +1,0 @@
-The following columns in the training set  don't have a corresponding argument in `MT5ForConditionalGeneration.forward` and have been ignored: translation.
-***** Running training *****
-  Num examples = 1000000
-  Num Epochs = 1
-  Instantaneous batch size per device = 4
-  Total train batch size (w. parallel, distributed & accumulation) = 4
-  Gradient Accumulation steps = 1
-  Total optimization steps = 250000
-PyTorch: setting up devices
