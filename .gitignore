@@ -1,2 +1,4 @@
 
 *.pdf
+*.docx
+/defgen_readings
