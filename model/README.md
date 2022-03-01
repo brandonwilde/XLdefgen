@@ -8,7 +8,7 @@ Example usage:
 
 ```bash
 python run_translation_no_trainer.py --file mt5_args_basic \
-	--seed 42 /
+	--seed 42 \
 	--output_dir /save/path
 ```
 
