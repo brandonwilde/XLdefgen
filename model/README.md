@@ -4,9 +4,9 @@
 
 Acknowledgement: This script is adapted from Huggingface example code (https://github.com/huggingface/transformers/tree/master/examples/pytorch/translation).
 
-The following are the arguments that may be passed when executing this script:
---dataset_name
---predict_with_generate
+The following are the arguments that may be passed when executing this script:\n
+--dataset_name\n
+--predict_with_generate\n
 --dataset_config_name
 --train_file
 --num_beams
