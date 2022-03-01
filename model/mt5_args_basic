@@ -1,6 +1,0 @@
---model_name_or_path google/mt5-small
---source_lang de
---target_lang en
---dataset_name wmt16
---dataset_config_name de-en
---output_dir ./fine-tuned_models
