@@ -75,7 +75,6 @@ class LoadFromFile(argparse.Action):
 def parse_args():
 
     parser = argparse.ArgumentParser(
-        allow_abbrev=True,
         description="Finetune a transformers model on a text classification task",
     )
         
