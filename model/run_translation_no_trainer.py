@@ -19,6 +19,7 @@ Fine-tuning a 🤗 Transformers model on text translation.
 # You can also adapt this script on your own text translation task. Pointers for this are left as comments.
 
 import argparse
+import shlex
 import logging
 import math
 import os
@@ -61,17 +62,23 @@ require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/tran
 MODEL_CONFIG_CLASSES = list(MODEL_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
+# Allow arguments to be passed as a text file
 class LoadFromFile(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         with values as f:
             # parse arguments in the file and store them in the target namespace
-            parser.parse_args(f.read().split(), namespace)
+            line = f.read()
+            parser.parse_args(shlex.split(line), namespace)
+
 
 # Parsing input arguments
 def parse_args():
 
-    parser = argparse.ArgumentParser(description="Finetune a transformers model on a text classification task")
-    
+    parser = argparse.ArgumentParser(
+        allow_abbrev=True,
+        description="Finetune a transformers model on a text classification task",
+    )
+        
     parser.add_argument(
         "--file",
         type=open,
@@ -115,14 +122,14 @@ def parse_args():
     parser.add_argument(
         "--max_source_length",
         type=int,
-        default=64,
+        default=128,
         help="The maximum total input sequence length after "
         "tokenization.Sequences longer than this will be truncated, sequences shorter will be padded.",
     )
     parser.add_argument(
         "--max_target_length",
         type=int,
-        default=64,
+        default=128,
         help="The maximum total sequence length for target text after "
         "tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
         "during ``evaluate`` and ``predict``.",
@@ -283,7 +290,7 @@ def parse_args():
     parser.add_argument(
         "--seed",
         type=int,
-        default=42,
+        default=None,
         help="A seed for reproducible training."
     )
     parser.add_argument(
