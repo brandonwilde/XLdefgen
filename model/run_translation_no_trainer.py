@@ -61,11 +61,23 @@ require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/tran
 MODEL_CONFIG_CLASSES = list(MODEL_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
+class LoadFromFile(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        with values as f:
+            # parse arguments in the file and store them in the target namespace
+            parser.parse_args(f.read().split(), namespace)
 
 # Parsing input arguments
 def parse_args():
 
     parser = argparse.ArgumentParser(description="Finetune a transformers model on a text classification task")
+    
+    parser.add_argument(
+        "--file",
+        type=open,
+        action=LoadFromFile
+    )
+    
     parser.add_argument(
         "--dataset_name",
         type=str,
@@ -188,7 +200,7 @@ def parse_args():
         type=str,
         default="google/mt5-small",
         help="Path to pretrained model or model identifier from huggingface.co/models.",
-        required=True,
+        # required=True,
     )
     parser.add_argument(
         "--config_name",
@@ -295,7 +307,7 @@ def parse_args():
     parser.add_argument(
         "--hub_token",
         type=str, 
-        elp="The token to use to push to the Model Hub."
+        help="The token to use to push to the Model Hub."
     )
     args = parser.parse_args()
 
@@ -320,7 +332,8 @@ def parse_args():
 def main():
     # Parse the arguments
     args = parse_args()
-
+    d = vars(args)
+    print(d)
     # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
     accelerator = Accelerator()
 

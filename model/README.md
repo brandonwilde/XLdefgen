@@ -4,7 +4,18 @@
 
 Acknowledgement: This script is adapted from Huggingface example code (https://github.com/huggingface/transformers/tree/master/examples/pytorch/translation).
 
-The following are all arguments that may be passed when executing this script:  
+Example usage:
+
+```bash
+python run_translation_no_trainer.py --file mt5_args_basic \
+	--seed 42 /
+	--output_dir /save/path
+```
+
+Below are all arguments that may be passed when executing this script.  
+Arguments may also be passed as a text file to --file. Any arguments specified afterwards  
+will override those indicated in the text file.
+
 --dataset_name  
 --predict_with_generate  
 --dataset_config_name  
@@ -33,7 +44,7 @@ The following are all arguments that may be passed when executing this script:
 --weight_decay  
 --num_train_epochs  
 --max_train_steps  
---gradient_accumulation_steps  - could be good to experiment with
+--gradient_accumulation_steps  - could be good to experiment with  
 --lr_scheduler_type  
 --num_warmup_steps  
 --output_dir  
