@@ -338,8 +338,7 @@ def parse_args():
 def main():
     # Parse the arguments
     args = parse_args()
-    d = vars(args)
-    print(d)
+
     # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
     accelerator = Accelerator()
 
@@ -405,7 +404,7 @@ def main():
     # In distributed training, the .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
     if args.config_name:
-        config = AutoConfig.from_pretrained(args.model_name_or_path)
+        config = AutoConfig.from_pretrained(args.model_name_or_path) # may edit this line
     elif args.model_name_or_path:
         config = AutoConfig.from_pretrained(args.model_name_or_path)
     else:
@@ -434,7 +433,7 @@ def main():
 
     model.resize_token_embeddings(len(tokenizer))
 
-    # Set decoder_start_token_id
+    # Set decoder_start_token_id to the the language code of the target language (!)
     if model.config.decoder_start_token_id is None and isinstance(tokenizer, (MBartTokenizer, MBartTokenizerFast)):
         assert (
             args.target_lang is not None and args.source_lang is not None
@@ -465,7 +464,7 @@ def main():
     source_lang = args.source_lang.split("_")[0]
     target_lang = args.target_lang.split("_")[0]
 
-    padding = "max_length" if args.pad_to_max_length else False
+    padding = "max_length" if args.pad_to_max_length else False #line seems unnecessary
 
     # Temporarily set max_target_length for training.
     max_target_length = args.max_target_length
