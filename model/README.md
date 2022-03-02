@@ -20,14 +20,14 @@ will override those indicated in the text file.
 --dataset_name  
 --predict_with_generate  
 --dataset_config_name  
---train_file  
+--train_file  		# CSV and JSON are your options
 --num_beams  
 --max_source_length  
 --max_target_length  
 --val_max_target_length  
---pad_to_max_length  
---validation_file  
---ignore_pad_token_for_loss****  
+--pad_to_max_length  	# For TPU training (it disables dynamic padding)  
+--validation_file  	# CSV and JSON are your options
+--ignore_pad_token_for_loss  
 --source_lang  
 --target_lang  
 --source_prefix  
