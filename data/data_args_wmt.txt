@@ -1,0 +1,6 @@
+--dataset_name		wmt16
+--dataset_config_name	de-en
+--train_size		10000
+--validation_size		100
+--save_path			wmt16_de-en
+--seed			42
