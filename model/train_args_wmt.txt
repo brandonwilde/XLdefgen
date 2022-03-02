@@ -1,6 +1,9 @@
 --model_name_or_path	google/mt5-small
---dataset_name		wmt16
---dataset_config_name	de-en
+--dataset_name		
+--dataset_config_name	
+--train_file		../data/wmt16_de-en_train.json
+--validation_file		../data/wmt16_de-en_val.json
+
 --source_lang		de
 --target_lang		en
 --max_source_length	64
