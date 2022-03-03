@@ -41,6 +41,7 @@ will override those indicated in the text file.
 --per_device_train_batch_size  
 --per_device_eval_batch_size  
 --gradient_accumulation_steps  - could be good to experiment with  
+--log_frequency
 --num_train_epochs  
 --max_train_steps  
 --learning_rate  
