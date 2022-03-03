@@ -7,6 +7,7 @@ Fine-tuning a 🤗 Transformers model on text translation.
 import argparse
 import shlex
 import logging
+import sys
 import math
 import os
 import random
@@ -330,7 +331,7 @@ def parse_args():
 def main():
     # Parse the arguments
     args = parse_args()
-
+    
     # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
     accelerator = Accelerator()
 
@@ -339,6 +340,8 @@ def main():
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO,
+        stream=sys.stdout,
+        filemode='w'
     )
     logger.info(accelerator.state)
 
@@ -598,10 +601,10 @@ def main():
                 progress_bar.update(1)      # Actually counts grad_accum steps rather than batches
                 completed_steps += 1        # Actually counts grad_accum steps rather than batches
 
-            if completed_steps >= args.max_train_steps:
+            if completed_steps >= args.max_train_steps + 1:
                 break
 
-            if completed_steps % args.log_freqency == 0 or step == len(train_dataloader) - 1:    # Evaluate by spec. frequency
+            if completed_steps % args.log_frequency == 0 or step == len(train_dataloader) - 1:    # Evaluate by spec. frequency
                 model.eval()
         
                 if args.val_max_target_length is None:
@@ -640,6 +643,8 @@ def main():
                         decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
         
                         metric.add_batch(predictions=decoded_preds, references=decoded_labels)
+                print(decoded_preds)
+                print(decoded_labels)
                 eval_metric = metric.compute()
                 logger.info({"bleu": eval_metric["score"]})
                 model.train()
