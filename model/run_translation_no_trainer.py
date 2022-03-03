@@ -1,22 +1,8 @@
 #!/usr/bin/env python
 # coding=utf-8
-# Copyright The HuggingFace Team and The HuggingFace Inc. team. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 """
 Fine-tuning a 🤗 Transformers model on text translation.
 """
-# You can also adapt this script on your own text translation task. Pointers for this are left as comments.
 
 import argparse
 import shlex
@@ -236,6 +222,12 @@ def parse_args():
         type=int,
         default=2,
         help="Batch size (per device) for the evaluation dataloader.",
+    )
+    parser.add_argument(
+        "--log_frequency",
+        type=int,
+        default=None,
+        help="Number of gradient accumulation steps prior to evaluating and logging model.",
     )
     parser.add_argument(
         "--learning_rate",
@@ -559,6 +551,10 @@ def main():
     else:
         args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
+    # If no log_frequency set, default to epoch logging
+    if args.log_frequency is None:
+        args.log_frequency = num_update_steps_per_epoch
+        
     lr_scheduler = get_scheduler(
         name=args.lr_scheduler_type,
         optimizer=optimizer,
@@ -592,78 +588,94 @@ def main():
         model.train()
         for step, batch in enumerate(train_dataloader):
             outputs = model(**batch)
-            loss = outputs.loss
+            loss = outputs.loss             # Gradient accumulating
             loss = loss / args.gradient_accumulation_steps
             accelerator.backward(loss)
             if step % args.gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
                 optimizer.step()
                 lr_scheduler.step()
-                optimizer.zero_grad()
-                progress_bar.update(1)
-                completed_steps += 1
+                optimizer.zero_grad()       # Reset gradients
+                progress_bar.update(1)      # Actually counts grad_accum steps rather than batches
+                completed_steps += 1        # Actually counts grad_accum steps rather than batches
 
             if completed_steps >= args.max_train_steps:
                 break
 
-        model.eval()
+            if completed_steps % args.log_freqency == 0 or step == len(train_dataloader) - 1:    # Evaluate by spec. frequency
+                model.eval()
+        
+                if args.val_max_target_length is None:
+                    args.val_max_target_length = args.max_target_length
+        
+                gen_kwargs = {
+                    "max_length": args.val_max_target_length if args is not None else config.max_length,
+                    "num_beams": args.num_beams,
+                }
+                for step, batch in enumerate(eval_dataloader):
+                    with torch.no_grad():
+                        generated_tokens = accelerator.unwrap_model(model).generate(
+                            batch["input_ids"],
+                            attention_mask=batch["attention_mask"],
+                            **gen_kwargs,
+                        )
+        
+                        generated_tokens = accelerator.pad_across_processes(
+                            generated_tokens, dim=1, pad_index=tokenizer.pad_token_id
+                        )
+                        labels = batch["labels"]
+                        if not args.pad_to_max_length:
+                            # If we did not pad to max length, we need to pad the labels too
+                            labels = accelerator.pad_across_processes(batch["labels"], dim=1, pad_index=tokenizer.pad_token_id)
+        
+                        generated_tokens = accelerator.gather(generated_tokens).cpu().numpy()
+                        labels = accelerator.gather(labels).cpu().numpy()
+        
+                        if args.ignore_pad_token_for_loss:
+                            # Replace -100 in the labels as we can't decode them.
+                            labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+        
+                        decoded_preds = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+                        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+        
+                        decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
+        
+                        metric.add_batch(predictions=decoded_preds, references=decoded_labels)
+                eval_metric = metric.compute()
+                logger.info({"bleu": eval_metric["score"]})
+                model.train()
 
-        if args.val_max_target_length is None:
-            args.val_max_target_length = args.max_target_length
-
-        gen_kwargs = {
-            "max_length": args.val_max_target_length if args is not None else config.max_length,
-            "num_beams": args.num_beams,
-        }
-        for step, batch in enumerate(eval_dataloader):
-            with torch.no_grad():
-                generated_tokens = accelerator.unwrap_model(model).generate(
-                    batch["input_ids"],
-                    attention_mask=batch["attention_mask"],
-                    **gen_kwargs,
-                )
-
-                generated_tokens = accelerator.pad_across_processes(
-                    generated_tokens, dim=1, pad_index=tokenizer.pad_token_id
-                )
-                labels = batch["labels"]
-                if not args.pad_to_max_length:
-                    # If we did not pad to max length, we need to pad the labels too
-                    labels = accelerator.pad_across_processes(batch["labels"], dim=1, pad_index=tokenizer.pad_token_id)
-
-                generated_tokens = accelerator.gather(generated_tokens).cpu().numpy()
-                labels = accelerator.gather(labels).cpu().numpy()
-
-                if args.ignore_pad_token_for_loss:
-                    # Replace -100 in the labels as we can't decode them.
-                    labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-
-                decoded_preds = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-                decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-
-                decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
-
-                metric.add_batch(predictions=decoded_preds, references=decoded_labels)
-        eval_metric = metric.compute()
-        logger.info({"bleu": eval_metric["score"]})
-
-        if args.push_to_hub and epoch < args.num_train_epochs - 1:
-            accelerator.wait_for_everyone()
-            unwrapped_model = accelerator.unwrap_model(model)
-            unwrapped_model.save_pretrained(args.output_dir, save_function=accelerator.save)
-            if accelerator.is_main_process:
-                tokenizer.save_pretrained(args.output_dir)
-                repo.push_to_hub(
-                    commit_message=f"Training in progress epoch {epoch}", blocking=False, auto_lfs_prune=True
-                )
-
-    if args.output_dir is not None:
+        # Save at end of each epoch
         accelerator.wait_for_everyone()
         unwrapped_model = accelerator.unwrap_model(model)
         unwrapped_model.save_pretrained(args.output_dir, save_function=accelerator.save)
-        if accelerator.is_main_process:
+        if accelerator.is_main_process:         # Only do once, if distributed
             tokenizer.save_pretrained(args.output_dir)
             if args.push_to_hub:
-                repo.push_to_hub(commit_message="End of training", auto_lfs_prune=True)
+                if epoch < args.num_train_epochs - 1:
+                    repo.push_to_hub(
+                        commit_message=f"Training in progress - epoch {epoch}", blocking=False, auto_lfs_prune=True
+                    )
+                else:
+                    repo.push_to_hub(commit_message="End of training", auto_lfs_prune=True)
+
+    #     if args.push_to_hub and epoch < args.num_train_epochs - 1:      # Push at end of each epoch
+    #         accelerator.wait_for_everyone()
+    #         unwrapped_model = accelerator.unwrap_model(model)
+    #         unwrapped_model.save_pretrained(args.output_dir, save_function=accelerator.save)
+    #         if accelerator.is_main_process:
+    #             tokenizer.save_pretrained(args.output_dir)
+    #             repo.push_to_hub(
+    #                 commit_message=f"Training in progress - epoch {epoch}", blocking=False, auto_lfs_prune=True
+    #             )
+
+    # if args.output_dir is not None:     # Save after final epoch
+    #     accelerator.wait_for_everyone()
+    #     unwrapped_model = accelerator.unwrap_model(model)
+    #     unwrapped_model.save_pretrained(args.output_dir, save_function=accelerator.save)
+    #     if accelerator.is_main_process:
+    #         tokenizer.save_pretrained(args.output_dir)
+    #         if args.push_to_hub:
+    #             repo.push_to_hub(commit_message="End of training", auto_lfs_prune=True)
 
 
 if __name__ == "__main__":
