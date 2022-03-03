@@ -56,3 +56,5 @@ will override those indicated in the text file.
 --push_to_hub  
 --hub_model_id  
 --hub_token  
+
+Can use HF 'stas/mt5-tiny-random' model for testing.
