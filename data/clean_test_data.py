@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 import regex as re
 
-file = "C:/Users/brand/Documents/Projects/XLdefgen/data/codwoe_test_de2.csv"
+file = "C:/Users/brand/Documents/Projects/XLdefgen/data/codwoe_test_de.csv"
 data = pd.read_csv(file)
 
 # Keep only exact matches (case-insensitive)
