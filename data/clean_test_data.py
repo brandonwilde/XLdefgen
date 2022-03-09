@@ -1,4 +1,5 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# coding=utf-8
 """
 Data cleaning - Remove any examples where the definiendum does not occur
 in the sample sentence.
@@ -39,7 +40,7 @@ for diff in diffs[0][20:30]:
 
 def matcher(series):
     '''Mark definiendum for exact matches.
-    May still include affixes.'''
+    Will still include affixes if present.'''
 
     sent = series['Beispiel']
     word = series['Wort']
