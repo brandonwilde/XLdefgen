@@ -39,7 +39,7 @@ def matcher(series):
         return sent[:start]+'*'+sent[start:end]+'*'+sent[end:]
     
     else: # No match
-        return False
+        return np.nan
 
 
 def matcher_1(series):
@@ -70,7 +70,7 @@ def matcher_1(series):
             return sent[:start]+'*'+sent[start:end]+'*'+sent[end:]
         
         else: # No match
-            return False
+            return np.nan
     
     else: # short word needs exact match
         match = re.search(word.lower(), sent.lower())
@@ -92,9 +92,9 @@ def matcher_1(series):
             return sent[:start]+'*'+sent[start:end]+'*'+sent[end:]
         
         else: # No match
-            return False
+            return np.nan
         
-def matcher_2(series): # This seems to let in too many false positive matches (about half)
+def matcher_2(series): # This seems to let in too many false positive matches (about half of the 67 added)
     """Mark definiendum for fuzzy matches.
     Allows up to one 'error' per match."""
     
@@ -147,24 +147,24 @@ def matcher_2(series): # This seems to let in too many false positive matches (a
             return False
 
         
-# Should change non-matches (in above code) to np.nan rather
-# than False in order to easily delete them with this line.
-data_clean = data.dropna()
-
-
-data['keep'] = data.apply(matcher, axis=1)
+# data['keep'] = data.apply(matcher, axis=1)
 data['keep1'] = data.apply(matcher_1, axis=1)
 # data['keep2'] = data.apply(matcher_2, axis=1)
 print(data)
 
+# Should change non-matches (in above code) to np.nan rather
+# than False in order to easily delete them with this line.
+data_clean = data.dropna()
+print(data_clean)
+
 # Show fuzzy match examples
-diffs = np.where(data['keep'] != data['keep1'])
-print(len(diffs[0]))
-for diff in diffs[0][10:40]:
-    print(data['word'].iloc[diff])
-    print(data['pos'].iloc[diff])
-    print(data['Wort'].iloc[diff])
-    print(data['keep'].iloc[diff])
-    print(data['keep1'].iloc[diff])
-    # print(data['keep2'].iloc[diff])
-    print()
+# diffs = np.where(data['keep'] != data['keep1'])
+# print(len(diffs[0]))
+# for diff in diffs[0][10:40]:
+#     print(data['word'].iloc[diff])
+#     print(data['pos'].iloc[diff])
+#     print(data['Wort'].iloc[diff])
+#     print(data['keep'].iloc[diff])
+#     print(data['keep1'].iloc[diff])
+#     # print(data['keep2'].iloc[diff])
+#     print()
