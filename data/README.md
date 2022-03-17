@@ -1,13 +1,20 @@
 # XLdefgen
 
-## Assemble data
+## Assemble training data
 
 For use when you only need a small portion of an available dataset.
 Use assemble_data.py to access a dataset from the Huggingface library,
 reduce it down to your desired training set and validation set sizes,
 and save local JSON files for each.
 
-Example usage:
+Recommended usage:
+```bash
+python assemble_data.py --file data_args_wmt.txt \
+```
+
+Below is an example using all arguments that may be passed when
+executing this script. Arguments may also be passed as a text file
+to --file.
 
 ```bash
 python assemble_data.py \
@@ -18,12 +25,3 @@ python assemble_data.py \
 	--save_path wmt16_de-en \
 	--seed 42
 ```
-
-Below are all arguments that may be passed when executing this script.  
-Arguments may also be passed as a text file to --file.
-
---dataset_name  
---dataset_config_name  
---train_size  
---save_path  
---seed  
