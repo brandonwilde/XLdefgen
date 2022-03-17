@@ -168,3 +168,6 @@ print(data_clean)
 #     print(data['keep1'].iloc[diff])
 #     # print(data['keep2'].iloc[diff])
 #     print()
+
+# Save marked data back to CSV file
+data_clean.to_csv('codwoe_test_de_marked.csv')
