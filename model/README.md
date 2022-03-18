@@ -6,7 +6,7 @@ Example usage:
 
 ```bash
 python run_translation_no_trainer.py \
-	--file train_args_wmt \
+	--file train_args_wmt.txt \
 	--seed 42 \
 	--output_dir /save/path
 ```
