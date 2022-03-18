@@ -10,7 +10,7 @@
 --source_prefix		"translate German to English: "
 --per_device_train_batch_size	1
 --per_device_eval_batch_size 	1
---log_frequency		500
+--log_frequency		100
 --learning_rate		2e-4
 --weight_decay		0.01
 --num_train_epochs	1
