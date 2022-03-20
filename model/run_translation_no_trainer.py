@@ -608,7 +608,7 @@ def main():
                 optimizer.zero_grad()       # Reset gradients
                 progress_bar.update(1)      # Actually counts grad_accum steps rather than batches
                 completed_steps += 1        # Actually counts grad_accum steps rather than batches
-                wandb.log({'epoch': epoch + step/len(train_dataloader), 'train_loss': loss})
+                wandb.log({'train/loss': loss})
 
             if completed_steps >= args.max_train_steps + 1:
                 break
@@ -712,7 +712,7 @@ def main():
                 val_loss = loss/len(eval_dataloader)
                 eval_metric = metric.compute()
                 logger.info({"bleu": eval_metric["score"]})
-                wandb.log({'epoch': epoch + 1, 'eval/loss': val_loss, 'bleu': eval_metric['score']})
+                wandb.log({'eval/loss': val_loss, 'eval/bleu': eval_metric['score']})
                 # wandb.log({'epoch': epoch + 1, 'eval/loss': val_loss})
                 model.train()
 
