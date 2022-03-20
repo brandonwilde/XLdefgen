@@ -6,6 +6,7 @@ Fine-tuning a 🤗 Transformers model on text translation.
 
 import argparse
 import shlex
+import wandb
 import logging
 import sys
 import math
@@ -332,6 +333,9 @@ def main():
     # Parse the arguments
     args = parse_args()
     
+    # Start WandB run
+    wandb.init(project="wandb_test")
+    
     # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
     accelerator = Accelerator()
 
@@ -405,7 +409,11 @@ def main():
     else:
         config = CONFIG_MAPPING[args.model_type]()
         logger.warning("You are instantiating a new config instance from scratch.")
-
+    
+    # Store model inputs and hyperparameters with WandB
+    w_config = wandb.config
+    w_config.update(config)
+    
     if args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name, use_fast=not args.use_slow_tokenizer)
     elif args.model_name_or_path:
@@ -600,6 +608,7 @@ def main():
                 optimizer.zero_grad()       # Reset gradients
                 progress_bar.update(1)      # Actually counts grad_accum steps rather than batches
                 completed_steps += 1        # Actually counts grad_accum steps rather than batches
+                wandb.log({'epoch': epoch + step/len(train_dataloader), 'train_loss': loss})
 
             if completed_steps >= args.max_train_steps + 1:
                 break
