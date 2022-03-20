@@ -499,8 +499,8 @@ def main():
     eval_dataset = processed_datasets["validation"]
 
     # Log a few random samples from the training set:
-    for index in random.sample(range(len(train_dataset)), 3):
-        logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
+#     for index in random.sample(range(len(train_dataset)), 3):
+#         logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
 
     # DataLoaders creation:
     label_pad_token_id = -100 if args.ignore_pad_token_for_loss else tokenizer.pad_token_id
