@@ -56,6 +56,8 @@ will override those indicated in the text file.
 --num_beams  
 
 --output_dir  
+--report_to  
+--wandb_proj  
 --push_to_hub  
 --hub_model_id  
 --hub_token  
