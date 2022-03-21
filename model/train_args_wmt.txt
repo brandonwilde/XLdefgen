@@ -18,4 +18,6 @@
 
 --num_warmup_steps	0
 --output_dir		./fine-tuned_models
+--report to			wandb
+--wandb_proj		XLdefgen
 --seed			42

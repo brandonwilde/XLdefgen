@@ -309,6 +309,18 @@ def parse_args():
         type=str, 
         help="The token to use to push to the Model Hub."
     )
+    parser.add_argument(
+        "--report_to",
+        type=str,
+        default=None,
+        help="Where to track metrics during training."
+    )
+    parser.add_argument(
+        "--wandb_proj",
+        type=str,
+        default=None,
+        help="The WandB project name for the current run."
+    )
     args = parser.parse_args()
 
     # Sanity checks
@@ -333,8 +345,9 @@ def main():
     # Parse the arguments
     args = parse_args()
     
-    # Start WandB run
-    wandb.init(project="wandb_test")
+    if args.report_to == "wandb":
+        # Start WandB run   
+        wandb.init(project=args.wandb_proj)            
     
     # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
     accelerator = Accelerator()
