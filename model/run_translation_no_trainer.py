@@ -724,9 +724,10 @@ def main():
                 print(decoded_preds)
                 print(decoded_labels)
                 val_loss = loss/len(eval_dataloader)
+                val_ppl = round(math.exp(val_loss),4)
                 eval_metric = metric.compute()
                 logger.info({"bleu": eval_metric["score"]})
-                wandb.log({'eval/loss': val_loss, 'eval/bleu': eval_metric['score']})
+                wandb.log({'eval/loss': val_loss, 'eval/perplexity': val_ppl, 'eval/bleu': eval_metric['score']})
                 # wandb.log({'epoch': epoch + 1, 'eval/loss': val_loss})
                 model.train()
 
