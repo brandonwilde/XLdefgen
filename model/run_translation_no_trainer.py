@@ -3,7 +3,7 @@
 """
 Fine-tuning a 🤗 Transformers model on text translation.
 """
-
+import pdb
 import argparse
 import shlex
 import wandb
@@ -594,7 +594,7 @@ def main():
     # Only show the progress bar once on each machine.
     progress_bar = tqdm(range(args.max_train_steps), disable=not accelerator.is_local_main_process)
     completed_steps = 0
-
+      
     for epoch in range(args.num_train_epochs):
         model.train()
         for step, batch in enumerate(train_dataloader):
@@ -608,13 +608,15 @@ def main():
                 optimizer.zero_grad()       # Reset gradients
                 progress_bar.update(1)      # Actually counts grad_accum steps rather than batches
                 completed_steps += 1        # Actually counts grad_accum steps rather than batches
-                wandb.log({'epoch': epoch + step/len(train_dataloader), 'train_loss': loss})
+                wandb.log({'train/loss': loss})
+
 
             if completed_steps >= args.max_train_steps + 1:
                 break
 
             if completed_steps % args.log_frequency == 0 or step == len(train_dataloader) - 1:    # Evaluate by spec. frequency
                 model.eval()
+                loss = 0
         
                 if args.val_max_target_length is None:
                     args.val_max_target_length = args.max_target_length
@@ -625,12 +627,32 @@ def main():
                 }
                 for step, batch in enumerate(eval_dataloader):
                     with torch.no_grad():
-                        generated_tokens = accelerator.unwrap_model(model).generate(
+                        
+                        # pdb.set_trace()
+                        
+                        outputs = model(**batch)
+                        loss += outputs.loss             # Gradient accumulating
+                        
+                        outputs = accelerator.unwrap_model(model).generate(
                             batch["input_ids"],
                             attention_mask=batch["attention_mask"],
                             **gen_kwargs,
+                            return_dict_in_generate=True,
+                            output_scores=True
                         )
-        
+                                                    
+                        # print(outputs)
+                        
+                        # generated_tokens = accelerator.unwrap_model(model).generate(
+                        #     batch["input_ids"],
+                        #     attention_mask=batch["attention_mask"],
+                        #     **gen_kwargs,
+                        # )
+                        
+                        generated_tokens, scores = outputs.sequences, outputs.scores
+                        # print("Generated tokens:", generated_tokens)
+                        # print("Scores:", scores)
+                        
                         generated_tokens = accelerator.pad_across_processes(
                             generated_tokens, dim=1, pad_index=tokenizer.pad_token_id
                         )
@@ -641,6 +663,37 @@ def main():
         
                         generated_tokens = accelerator.gather(generated_tokens).cpu().numpy()
                         labels = accelerator.gather(labels).cpu().numpy()
+                        
+                        # print("Generated:", scores)
+                        # print(scores[0].shape)
+                        # print(type(scores[0]))
+                        # print(scores[0].get_device())
+                        
+                        # print("Truth:", labels)
+                        # print(labels.shape)
+                        # print(type(labels))
+                        # # print(labels.get_device())
+                        
+                        # score_stack = torch.vstack(scores)
+                        # print(score_stack.get_device())
+                        # score_stack = torch.vstack((score_stack, torch.zeros(config.vocab_size).to(0)))
+                        # print(type(score_stack))
+                        # print(score_stack)
+                        
+                        # vocab = np.identity(config.vocab_size, dtype='int')
+                        # onehots = np.ndarray((0,config.vocab_size))
+                        # for id in labels:
+                        #     onehots = np.append(onehots,vocab[id],axis=0)
+                        # onehots = torch.from_numpy(onehots).to(0)
+                        
+                        # print(type(onehots))
+                        # print(onehots)
+                        
+                        # print(score_stack.get_device())
+                        # print(onehots.get_device())
+                        
+                        # # loss_fxn = torch.nn.CrossEntropyLoss()
+                        # # loss += loss_fxn(score_stack, onehots)
         
                         if args.ignore_pad_token_for_loss:
                             # Replace -100 in the labels as we can't decode them.
@@ -650,12 +703,18 @@ def main():
                         decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
         
                         decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
-        
+                        # print(decoded_preds)
+                        # print(decoded_labels)
+                        # loss_fxn = torch.nn.CrossEntropyLoss()
+                        # loss += loss_fxn(score_stack, onehots)
                         metric.add_batch(predictions=decoded_preds, references=decoded_labels)
                 print(decoded_preds)
                 print(decoded_labels)
+                val_loss = loss/len(eval_dataloader)
                 eval_metric = metric.compute()
                 logger.info({"bleu": eval_metric["score"]})
+                wandb.log({'eval/loss': val_loss, 'eval/bleu': eval_metric['score']})
+                # wandb.log({'epoch': epoch + 1, 'eval/loss': val_loss})
                 model.train()
 
         # Save at end of each epoch
