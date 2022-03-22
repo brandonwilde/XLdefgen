@@ -651,7 +651,7 @@ def main():
                 progress_bar.update(1)      # Actually counts grad_accum steps rather than batches
                 completed_steps += 1        # Actually counts grad_accum steps rather than batches
                 if args.report_to == "wandb":
-                    wandb.log({'train/loss': loss})
+                    wandb.log({'train/epoch': epoch+step/len(train_dataloader), 'train/loss': loss})
 
 
             if completed_steps >= args.max_train_steps + 1:
