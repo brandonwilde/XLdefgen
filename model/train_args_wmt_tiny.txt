@@ -17,7 +17,7 @@
 --gradient_accumulation_steps	1
 
 --num_warmup_steps	0
---output_dir		./fine-tuned_model_tiny
+--output_dir		wandb_run
 --report_to			wandb
 --wandb_proj		wandb_test
 --seed			42
