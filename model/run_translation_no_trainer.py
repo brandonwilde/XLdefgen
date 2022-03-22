@@ -644,14 +644,19 @@ def main():
             loss = outputs.loss             # Gradient accumulating
             loss = loss / args.gradient_accumulation_steps
             accelerator.backward(loss)
-            if step % args.gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
+            # if step % args.gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
+            if step % args.gradient_accumulation_steps == 0:
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()       # Reset gradients
                 progress_bar.update(1)      # Actually counts grad_accum steps rather than batches
                 completed_steps += 1        # Actually counts grad_accum steps rather than batches
                 if args.report_to == "wandb":
-                    wandb.log({'train/epoch': epoch+step/len(train_dataloader), 'train/loss': loss})
+                    wandb.log({'epoch': epoch+step/len(train_dataloader),
+                               'batch': epoch*len(train_dataloader)+step,
+                               'effective_batch': completed_steps-1,
+                               'train/loss': loss,
+                               })
 
 
             if completed_steps >= args.max_train_steps + 1:
@@ -758,7 +763,13 @@ def main():
                 eval_metric = metric.compute()
                 logger.info({"bleu": eval_metric["score"]})
                 if args.report_to == "wandb":
-                    wandb.log({'eval/loss': val_loss, 'eval/perplexity': val_ppl, 'eval/bleu': eval_metric['score']})
+                    wandb.log({'epoch': epoch+1,
+                               'batch': (epoch+1)*len(train_dataloader),
+                               'effective_batch': completed_steps,
+                               'eval/loss': val_loss,
+                               'eval/perplexity': val_ppl,
+                               'eval/bleu': eval_metric['score'],
+                               })
                 model.train()
 
         # Save at end of each epoch
