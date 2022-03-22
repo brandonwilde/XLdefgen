@@ -343,11 +343,7 @@ def parse_args():
 
 def main():
     # Parse the arguments
-    args = parse_args()
-    
-    # Start WandB run   
-    if args.report_to == "wandb":
-        wandb.init(project=args.wandb_proj)            
+    args = parse_args()  
     
     # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
     accelerator = Accelerator()
@@ -422,11 +418,6 @@ def main():
     else:
         config = CONFIG_MAPPING[args.model_type]()
         logger.warning("You are instantiating a new config instance from scratch.")
-    
-    # Store model inputs and hyperparameters with WandB
-    if args.report_to == "wandb":
-        w_config = wandb.config
-        w_config.update(config)
     
     if args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name, use_fast=not args.use_slow_tokenizer)
@@ -594,8 +585,20 @@ def main():
         labels = [[label.strip()] for label in labels]
 
         return preds, labels
+    
 
     # Train!
+
+    if args.report_to == "wandb":
+        wb_config = config.to_dict()
+        wb_config.update(vars(args))
+        wandb.init(
+            project=args.wandb_proj,
+            # notes="",
+            # tags="",
+            config=wb_config
+            )
+    
     total_batch_size = args.per_device_train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
 
     logger.info("***** Running training *****")
