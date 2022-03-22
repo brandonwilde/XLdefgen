@@ -644,7 +644,6 @@ def main():
             loss = outputs.loss             # Gradient accumulating
             loss = loss / args.gradient_accumulation_steps
             accelerator.backward(loss)
-            # if step % args.gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
             if step % args.gradient_accumulation_steps == 0:
                 optimizer.step()
                 lr_scheduler.step()
@@ -657,7 +656,6 @@ def main():
                                'effective_batch': completed_steps-1,
                                'train/loss': loss,
                                })
-
 
             if completed_steps >= args.max_train_steps + 1:
                 break
@@ -675,9 +673,7 @@ def main():
                 }
                 for step, batch in enumerate(eval_dataloader):
                     with torch.no_grad():
-                        
-                        # pdb.set_trace()
-                        
+                                                
                         outputs = model(**batch)
                         loss += outputs.loss             # Gradient accumulating
                         
@@ -688,18 +684,8 @@ def main():
                             return_dict_in_generate=True,
                             output_scores=True
                         )
-                                                    
-                        # print(outputs)
                         
-                        # generated_tokens = accelerator.unwrap_model(model).generate(
-                        #     batch["input_ids"],
-                        #     attention_mask=batch["attention_mask"],
-                        #     **gen_kwargs,
-                        # )
-                        
-                        generated_tokens, scores = outputs.sequences, outputs.scores
-                        # print("Generated tokens:", generated_tokens)
-                        # print("Scores:", scores)
+                        generated_tokens = outputs.sequences
                         
                         generated_tokens = accelerator.pad_across_processes(
                             generated_tokens, dim=1, pad_index=tokenizer.pad_token_id
@@ -711,38 +697,7 @@ def main():
         
                         generated_tokens = accelerator.gather(generated_tokens).cpu().numpy()
                         labels = accelerator.gather(labels).cpu().numpy()
-                        
-                        # print("Generated:", scores)
-                        # print(scores[0].shape)
-                        # print(type(scores[0]))
-                        # print(scores[0].get_device())
-                        
-                        # print("Truth:", labels)
-                        # print(labels.shape)
-                        # print(type(labels))
-                        # # print(labels.get_device())
-                        
-                        # score_stack = torch.vstack(scores)
-                        # print(score_stack.get_device())
-                        # score_stack = torch.vstack((score_stack, torch.zeros(config.vocab_size).to(0)))
-                        # print(type(score_stack))
-                        # print(score_stack)
-                        
-                        # vocab = np.identity(config.vocab_size, dtype='int')
-                        # onehots = np.ndarray((0,config.vocab_size))
-                        # for id in labels:
-                        #     onehots = np.append(onehots,vocab[id],axis=0)
-                        # onehots = torch.from_numpy(onehots).to(0)
-                        
-                        # print(type(onehots))
-                        # print(onehots)
-                        
-                        # print(score_stack.get_device())
-                        # print(onehots.get_device())
-                        
-                        # # loss_fxn = torch.nn.CrossEntropyLoss()
-                        # # loss += loss_fxn(score_stack, onehots)
-        
+                                
                         if args.ignore_pad_token_for_loss:
                             # Replace -100 in the labels as we can't decode them.
                             labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
@@ -751,10 +706,7 @@ def main():
                         decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
         
                         decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
-                        # print(decoded_preds)
-                        # print(decoded_labels)
-                        # loss_fxn = torch.nn.CrossEntropyLoss()
-                        # loss += loss_fxn(score_stack, onehots)
+
                         metric.add_batch(predictions=decoded_preds, references=decoded_labels)
                 print(decoded_preds)
                 print(decoded_labels)
@@ -785,26 +737,6 @@ def main():
                     )
                 else:
                     repo.push_to_hub(commit_message="End of training", auto_lfs_prune=True)
-
-    #     if args.push_to_hub and epoch < args.num_train_epochs - 1:      # Push at end of each epoch
-    #         accelerator.wait_for_everyone()
-    #         unwrapped_model = accelerator.unwrap_model(model)
-    #         unwrapped_model.save_pretrained(args.output_dir, save_function=accelerator.save)
-    #         if accelerator.is_main_process:
-    #             tokenizer.save_pretrained(args.output_dir)
-    #             repo.push_to_hub(
-    #                 commit_message=f"Training in progress - epoch {epoch}", blocking=False, auto_lfs_prune=True
-    #             )
-
-    # if args.output_dir is not None:     # Save after final epoch
-    #     accelerator.wait_for_everyone()
-    #     unwrapped_model = accelerator.unwrap_model(model)
-    #     unwrapped_model.save_pretrained(args.output_dir, save_function=accelerator.save)
-    #     if accelerator.is_main_process:
-    #         tokenizer.save_pretrained(args.output_dir)
-    #         if args.push_to_hub:
-    #             repo.push_to_hub(commit_message="End of training", auto_lfs_prune=True)
-
 
 if __name__ == "__main__":
 
