@@ -321,6 +321,18 @@ def parse_args():
         default=None,
         help="The WandB project name for the current run."
     )
+    parser.add_argument(
+        "--notes",
+        type=str,
+        default=None,
+        help="WandB notes to be associated with the current run."
+    )
+    parser.add_argument(
+        "--tags",
+        type=str,
+        default=None,
+        help="Comma-separated WandB tags to be associated with the current run."
+    )
     args = parser.parse_args()
 
     # Sanity checks
@@ -590,12 +602,17 @@ def main():
     # Train!
 
     if args.report_to == "wandb":
+        
+        # Report hyperparameters
         wb_config = config.to_dict()
         wb_config.update(vars(args))
+        
+        tags = args.tags.split(",") if args.tags else None
+        
         wandb.init(
             project=args.wandb_proj,
-            # notes="",
-            # tags="",
+            notes=args.notes,
+            tags=tags,
             config=wb_config
             )
     

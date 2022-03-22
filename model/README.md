@@ -58,6 +58,9 @@ will override those indicated in the text file.
 --output_dir  
 --report_to  
 --wandb_proj  
+--notes  
+--tags  
+
 --push_to_hub  
 --hub_model_id  
 --hub_token  
