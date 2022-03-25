@@ -70,6 +70,9 @@ Can use HF 'stas/mt5-tiny-random' model for testing.
 
 ## Train model WITH Trainer API
 
+Model not currently in use. If using, you may need to update the  
+dataset path or run the script from the model directory.
+
 Example usage:
 
 ```bash
