@@ -14,7 +14,7 @@
 --learning_rate		2e-4
 --weight_decay		0.01
 --num_train_epochs	1
---gradient_accumulation_steps	1
+--gradient_accumulation_steps	2
 
 --num_warmup_steps	0
 --output_dir		wandb_run

@@ -715,8 +715,10 @@ def main():
                 eval_metric = metric.compute()
                 logger.info({"bleu": eval_metric["score"]})
                 if args.report_to == "wandb":
-                    wandb.log({'epoch': epoch+1,
-                               'batch': (epoch+1)*len(train_dataloader),
+                    wandb.log({'epoch': epoch+step/len(train_dataloader),
+                               'batch': epoch*len(train_dataloader)+step,
+                               # 'epoch': epoch+1,
+                               # 'batch': (epoch+1)*len(train_dataloader),
                                'effective_batch': completed_steps,
                                'eval/loss': val_loss,
                                'eval/perplexity': val_ppl,
