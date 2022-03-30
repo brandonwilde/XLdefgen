@@ -3,6 +3,8 @@
 """
 Mark the definiendum in each sample sentence, and remove any examples
 where the definiendum does not occur in the sample sentence.
+All prefixes and suffixes will be included so long as the root definiendum
+is matched.
 """
 
 import argparse
@@ -85,7 +87,7 @@ def main():
             except:
                 start = 0
             
-            try:    # Get end index of match (may need to account for affixes)
+            try:    # Get end index of match (may need to account for suffixes)
                 end = e_match + re.search('\W', sent[e_match:]).span()[0]
             except:
                 end = len(sent)
@@ -116,7 +118,7 @@ def main():
                 except:
                     start = 0
                 
-                try:    # Get end index of match (may need to account for affixes)
+                try:    # Get end index of match (may need to account for suffixes)
                     end = e_match + re.search('\W', sent[e_match:]).span()[0]
                 except:
                     end = len(sent)
@@ -138,7 +140,7 @@ def main():
                 except:
                     start = 0
                 
-                try:    # Get end index of match (may need to account for affixes)
+                try:    # Get end index of match (may need to account for suffixes)
                     end = e_match + re.search('\W', sent[e_match:]).span()[0]
                 except:
                     end = len(sent)
@@ -168,7 +170,7 @@ def main():
                 except:
                     start = 0
                 
-                try:    # Get end index of match (may need to account for affixes)
+                try:    # Get end index of match (may need to account for suffixes)
                     end = e_match + re.search('\W', sent[e_match:]).span()[0]
                 except:
                     end = len(sent)
@@ -190,7 +192,7 @@ def main():
                 except:
                     start = 0
                 
-                try:    # Get end index of match (may need to account for affixes)
+                try:    # Get end index of match (may need to account for suffixes)
                     end = e_match + re.search('\W', sent[e_match:]).span()[0]
                 except:
                     end = len(sent)
