@@ -638,93 +638,90 @@ def main():
     completed_steps = 0
       
     for epoch in range(args.num_train_epochs):
-        model.train()
-        for step, batch in enumerate(train_dataloader):
+        for train_step, batch in enumerate(train_dataloader):
+            model.train()
             outputs = model(**batch)
             loss = outputs.loss             # Gradient accumulating
             loss = loss / args.gradient_accumulation_steps
             accelerator.backward(loss)
-            if step % args.gradient_accumulation_steps == 0:
+            if (train_step+1) % args.gradient_accumulation_steps == 0:
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()       # Reset gradients
                 progress_bar.update(1)      # Actually counts grad_accum steps rather than batches
                 completed_steps += 1        # Actually counts grad_accum steps rather than batches
                 if args.report_to == "wandb":
-                    wandb.log({'epoch': epoch+step/len(train_dataloader),
-                               'batch': epoch*len(train_dataloader)+step,
-                               'effective_batch': completed_steps-1,
+                    wandb.log({'epoch': epoch+(train_step+1)/len(train_dataloader),
+                               'batch': epoch*len(train_dataloader)+train_step+1,
+                               'effective_batch': completed_steps,
                                'train/loss': loss,
                                })
 
-            if completed_steps >= args.max_train_steps + 1:
-                break
-
-            if completed_steps % args.log_frequency == 0 or step == len(train_dataloader) - 1:    # Evaluate by spec. frequency
-                model.eval()
-                loss = 0
-        
-                if args.val_max_target_length is None:
-                    args.val_max_target_length = args.max_target_length
-        
-                gen_kwargs = {
-                    "max_length": args.val_max_target_length if args is not None else config.max_length,
-                    "num_beams": args.num_beams,
-                }
-                for step, batch in enumerate(eval_dataloader):
-                    with torch.no_grad():
-                                                
-                        outputs = model(**batch)
-                        loss += outputs.loss             # Gradient accumulating
-                        
-                        outputs = accelerator.unwrap_model(model).generate(
-                            batch["input_ids"],
-                            attention_mask=batch["attention_mask"],
-                            **gen_kwargs,
-                            return_dict_in_generate=True,
-                            output_scores=True
-                        )
-                        
-                        generated_tokens = outputs.sequences
-                        
-                        generated_tokens = accelerator.pad_across_processes(
-                            generated_tokens, dim=1, pad_index=tokenizer.pad_token_id
-                        )
-                        labels = batch["labels"]
-                        if not args.pad_to_max_length:
-                            # If we did not pad to max length, we need to pad the labels too
-                            labels = accelerator.pad_across_processes(batch["labels"], dim=1, pad_index=tokenizer.pad_token_id)
-        
-                        generated_tokens = accelerator.gather(generated_tokens).cpu().numpy()
-                        labels = accelerator.gather(labels).cpu().numpy()
-                                
-                        if args.ignore_pad_token_for_loss:
-                            # Replace -100 in the labels as we can't decode them.
-                            labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-        
-                        decoded_preds = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-                        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-        
-                        decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
-
-                        metric.add_batch(predictions=decoded_preds, references=decoded_labels)
-                print(decoded_preds)
-                print(decoded_labels)
-                val_loss = loss/len(eval_dataloader)
-                val_ppl = round(math.exp(val_loss),4)
-                eval_metric = metric.compute()
-                logger.info({"bleu": eval_metric["score"]})
-                if args.report_to == "wandb":
-                    wandb.log({'epoch': epoch+step/len(train_dataloader),
-                               'batch': epoch*len(train_dataloader)+step,
-                               # 'epoch': epoch+1,
-                               # 'batch': (epoch+1)*len(train_dataloader),
-                               'effective_batch': completed_steps,
-                               'eval/loss': val_loss,
-                               'eval/perplexity': val_ppl,
-                               'eval/bleu': eval_metric['score'],
-                               })
-                model.train()
+                if completed_steps % args.log_frequency == 0 or train_step == len(train_dataloader) - 1:    # Evaluate by spec. frequency
+                    model.eval()
+                    loss = 0
+            
+                    if args.val_max_target_length is None:
+                        args.val_max_target_length = args.max_target_length
+            
+                    gen_kwargs = {
+                        "max_length": args.val_max_target_length if args is not None else config.max_length,
+                        "num_beams": args.num_beams,
+                    }
+                    for eval_step, batch in enumerate(eval_dataloader):
+                        with torch.no_grad():
+                                                    
+                            outputs = model(**batch)
+                            loss += outputs.loss             # Gradient accumulating
+                            
+                            outputs = accelerator.unwrap_model(model).generate(
+                                batch["input_ids"],
+                                attention_mask=batch["attention_mask"],
+                                **gen_kwargs,
+                                return_dict_in_generate=True,
+                                output_scores=True
+                            )
+                            
+                            generated_tokens = outputs.sequences
+                            
+                            generated_tokens = accelerator.pad_across_processes(
+                                generated_tokens, dim=1, pad_index=tokenizer.pad_token_id
+                            )
+                            labels = batch["labels"]
+                            if not args.pad_to_max_length:
+                                # If we did not pad to max length, we need to pad the labels too
+                                labels = accelerator.pad_across_processes(batch["labels"], dim=1, pad_index=tokenizer.pad_token_id)
+            
+                            generated_tokens = accelerator.gather(generated_tokens).cpu().numpy()
+                            labels = accelerator.gather(labels).cpu().numpy()
+                                    
+                            if args.ignore_pad_token_for_loss:
+                                # Replace -100 in the labels as we can't decode them.
+                                labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+            
+                            decoded_preds = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+                            decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+            
+                            decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
+    
+                            metric.add_batch(predictions=decoded_preds, references=decoded_labels)
+                    print("Epochs completed:", epoch+(train_step+1)/len(train_dataloader))
+                    print(decoded_preds)
+                    print(decoded_labels)
+                    val_loss = loss/len(eval_dataloader)
+                    val_ppl = round(math.exp(val_loss),4)
+                    eval_metric = metric.compute()
+                    logger.info({"bleu": eval_metric["score"]})
+                    if args.report_to == "wandb":
+                        wandb.log({'epoch': epoch+(train_step+1)/len(train_dataloader),
+                                   'batch': epoch*len(train_dataloader)+train_step+1,
+                                   'effective_batch': completed_steps,
+                                   'eval/loss': val_loss,
+                                   'eval/perplexity': val_ppl,
+                                   'eval/bleu': eval_metric['score'],
+                                   })
+                if completed_steps >= args.max_train_steps:
+                    break
 
         # Save at end of each epoch
         accelerator.wait_for_everyone()
