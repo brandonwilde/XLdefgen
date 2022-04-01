@@ -37,7 +37,7 @@ python mark_data.py \
 	--input_file codwoe_test_de.csv \
 	--lang de \
 	--allow 1 \
-	--output_file codwoe_test_de_marked.csv
+	--output_file codwoe_test_de_marked.json
 ```
 
 Specify which language should be processed and how lenient the word-
