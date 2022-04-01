@@ -335,6 +335,12 @@ def parse_args():
         default=None,
         help="Comma-separated WandB tags to be associated with the current run."
     )
+    parser.add_argument(
+        "--data_task",
+        type=str,
+        default="definition",
+        help="Specify what kind of data is being used. Should be translation or definition."
+    )
     args = parser.parse_args()
 
     # Sanity checks
@@ -345,6 +351,7 @@ def parse_args():
     if args.train_file is not None:
         extension = args.train_file.split(".")[-1]
         assert extension in ["csv", "json"], "`train_file` should be a csv or a json file."
+        
     if args.validation_file is not None:
         extension = args.validation_file.split(".")[-1]
         assert extension in ["csv", "json"], "`validation_file` should be a csv or a json file."
@@ -352,6 +359,9 @@ def parse_args():
     if args.push_to_hub:
         assert args.output_dir is not None, "Need an `output_dir` to create a repo when `--push_to_hub` is passed."
 
+    if args.data_task is not None:
+        assert args.data_task in ["translation", "definition"], "`data_task` should be translation or definition."
+        
     return args
 
 
@@ -408,7 +418,7 @@ def main():
     # For CSV/JSON files, this script will use the column called 'text' or the first column if no column called
     # 'text' is found. You can easily tweak this behavior (see below).
     #
-    # In distributed training, the load_dataset function guarantee that only one local process can concurrently
+    # In distributed training, the load_dataset function guarantees that only one local process can concurrently
     # download the dataset.
     if args.dataset_name is not None:
         # Downloading and loading a dataset from the hub.
@@ -494,10 +504,18 @@ def main():
     # Temporarily set max_target_length for training.
     max_target_length = args.max_target_length
     padding = "max_length" if args.pad_to_max_length else False
-
+        
+    # May need to edit this if train and validation datasets have different data_task
     def preprocess_function(examples):
-        inputs = [ex[source_lang] for ex in examples["translation"]]
-        targets = [ex[target_lang] for ex in examples["translation"]]
+        input_label = source_lang
+        target_label = target_lang
+        
+        if args.data_task == "definition":
+            input_label += "_example"
+            target_label += "_gloss"
+            
+        inputs = [ex[input_label] for ex in examples[args.data_task]]
+        targets = [ex[target_label] for ex in examples[args.data_task]]
         inputs = [prefix + inp for inp in inputs]
         model_inputs = tokenizer(inputs, max_length=args.max_source_length, padding=padding, truncation=True)
 
@@ -640,6 +658,7 @@ def main():
     for epoch in range(args.num_train_epochs):
         for train_step, batch in enumerate(train_dataloader):
             model.train()
+            # breakpoint()
             outputs = model(**batch)
             loss = outputs.loss             # Gradient accumulating
             loss = loss / args.gradient_accumulation_steps
@@ -670,7 +689,8 @@ def main():
                     }
                     for eval_step, batch in enumerate(eval_dataloader):
                         with torch.no_grad():
-                                                    
+                            
+                            # breakpoint()
                             outputs = model(**batch)
                             loss += outputs.loss             # Gradient accumulating
                             
