@@ -1,13 +1,13 @@
-## Assemble training data
+## Split data
 
-For use when you only need a small portion of an available dataset.
-Use assemble_data.py to access a dataset from the Huggingface library,
-reduce it down to your desired training set and validation set sizes,
-and save local JSON files for each.
+For use when you need to split training and test data, or if you need
+to reduce the size of the training/validation datasets. Also works
+when calling a dataset directly from the Hugging Face library.
+Will save train and validation datasets as local JSON files.
 
 Recommended usage:
 ```bash
-python assemble_data.py --file data_args_wmt.txt \
+python split_data.py --file data_args_wmt.txt \
 ```
 
 Below is an example using all arguments that may be passed when
@@ -15,8 +15,8 @@ executing this script. Arguments may also be passed as a text file
 to --file.
 
 ```bash
-python assemble_data.py \
-	--dataset_name wmt16 \
+python split_data.py \
+	--dataset_name_or_path wmt16 \
 	--dataset_config_name de-en \
 	--train_size 10000 \
 	--validation_size 100 \

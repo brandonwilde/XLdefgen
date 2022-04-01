@@ -31,7 +31,7 @@ def parse_args():
     )
     
     parser.add_argument(
-        "--dataset_name",
+        "--dataset_name_or_path",
         type=str,
         default=None,
         help="The name of the dataset to use (via the datasets library).",
@@ -89,15 +89,23 @@ def main():
     
     # assert save_filetype in ["csv", "json"], "`train_file` should be a csv or a json file."
     
-    if args.dataset_name is not None:
-        raw_datasets = load_dataset(args.dataset_name, args.dataset_config_name)
+        
+    try:
+        extension = args.dataset_name_or_path.split(".")[-1]
+    except:
+        pass
     
+    if extension == "json":
+        raw_datasets = load_dataset(extension, data_files=args.dataset_name_or_path)
+    else:   
+        raw_datasets = load_dataset(args.dataset_name_or_path, args.dataset_config_name)
+        
     if args.train_size is not None:
         train_data = raw_datasets["train"].shuffle(seed=args.seed).select(range(args.train_size))
-    
     if args.validation_size is not None:
-        val_data = raw_datasets["validation"].shuffle(seed=args.seed).select(range(args.validation_size))
-    
+        source = 'validation' if 'validation' in raw_datasets.keys() else 'train'
+        val_data = raw_datasets[source].shuffle(seed=args.seed).select(range(args.validation_size))
+
     if save_filetype == 'json':
         train_data.to_json(args.save_path + '_train.json')
         val_data.to_json(args.save_path + '_val.json')
