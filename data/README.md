@@ -26,9 +26,9 @@ python assemble_data.py \
 
 ## Mark data
 
-For use when preparing a dataset from a list of words, glosses, and  
-sample sentences. Use mark_data.py to mark the definiendum in each  
-sample sentence, and remove any examples where the definiendum does not  
+For use when preparing a dataset from a list of words, glosses, and
+sample sentences. Use mark_data.py to mark the definiendum in each
+sample sentence, and remove any examples where the definiendum does not
 occur in the sample sentence.
 
 Usage:
