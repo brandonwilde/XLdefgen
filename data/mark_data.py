@@ -230,10 +230,17 @@ def main():
     #     # print(data['keep2'].iloc[diff])
     #     print()
     
-    # Save marked data back to CSV file - or no save if no file specified       
-    data_clean.to_csv(args.output_file)
+    # Save marked data to JSON file      
+    data_clean.to_json("temp_file.json", orient='records', lines=True)
+   
+    # Add additional dict layer specifying task
+    with open("temp_file.json", 'r') as f:
+        file_lines = [''.join(['{"definition":', line.strip(), "}", '\n']) for line in f.readlines()]
+    
+    with open(args.output_file, 'w') as f:
+        f.writelines(file_lines) 
+    
     print("Marked data saved in", args.output_file)
-
 
 if __name__ == "__main__":
 
