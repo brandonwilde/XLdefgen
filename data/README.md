@@ -1,5 +1,3 @@
-# XLdefgen
-
 ## Assemble training data
 
 For use when you only need a small portion of an available dataset.
@@ -25,3 +23,24 @@ python assemble_data.py \
 	--save_path wmt16_de-en \
 	--seed 42
 ```
+
+## Mark data
+
+For use when preparing a dataset from a list of words, glosses, and  
+sample sentences. Use mark_data.py to mark the definiendum in each  
+sample sentence, and remove any examples where the definiendum does not  
+occur in the sample sentence.
+
+Usage:
+```bash
+python mark_data.py \
+	--input_file codwoe_test_de.csv \
+	--lang de \
+	--allow 1 \
+	--output_file codwoe_test_de_marked.csv
+```
+
+Specify which language should be processed and how lenient the word-
+matcher should be (kwarg: allow). The allowance is based on Minimum
+Edit Distance, and will accept 0, 1, and 2 as inputs, with 0 restricting
+the matcher to exact matches, and 2 permitting an MED of up to 2.
