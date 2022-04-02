@@ -1,7 +1,7 @@
 --model_name_or_path	google/mt5-small
 
---train_file		../data/codwoe_train_en_marked.json
---validation_file		../data/codwoe_test_en_marked.json
+--train_file		../data/codwoe/codwoe_train_en_marked.json
+--validation_file		../data/codwoe/codwoe_test_en_marked.json
 
 --source_lang		en
 --target_lang		en

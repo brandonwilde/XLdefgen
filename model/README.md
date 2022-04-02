@@ -1,17 +1,17 @@
-## Train model without Trainer API
+## Train model
 
 Acknowledgement: This script is adapted from Huggingface example code (https://github.com/huggingface/transformers/tree/master/examples/pytorch/translation).
 
 Example usage:
 
 ```bash
-python run_translation_no_trainer.py --file train_args_wmt.txt
+python run_model.py --file train_args_wmt.txt
 ```
 
 OR (for testing on small GPU)
 
 ```bash
-python run_translation_no_trainer.py --file train_args_wmt_tiny.txt
+python run_model.py --file train_args_wmt_tiny.txt
 ```
 
 Below are all arguments that may be passed when executing this script.  
@@ -43,7 +43,7 @@ will override those indicated in the text file.
 --seed  
 --per_device_train_batch_size  
 --per_device_eval_batch_size  
---gradient_accumulation_steps  - could be good to experiment with  
+--gradient_accumulation_steps  
 --log_frequency  
 --num_train_epochs  
 --max_train_steps  
@@ -66,21 +66,3 @@ will override those indicated in the text file.
 --hub_token  
 
 Can use HF 'stas/mt5-tiny-random' model for testing.
-
-
-## Train model WITH Trainer API
-
-Model not currently in use. If using, you may need to update the  
-dataset path or run the script from the model directory.
-
-Example usage:
-
-```bash
-python run_translation_with_trainer.py trainer_test_args.json
-```
-
-OR (for testing on small GPU)
-
-```bash
-python run_translation_with_trainer.py --file train_smalltest_args.json
-```
