@@ -248,7 +248,7 @@ def main():
     with open(args.output_file, 'w') as f:
         for line in ds:
             d = {}
-            d["def"] = line
+            d["definition"] = line
             f.write(json.dumps(d) + '\n') 
     #         l.append(d)
     # json.dumps(l)
