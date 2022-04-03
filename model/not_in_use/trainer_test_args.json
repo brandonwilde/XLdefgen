@@ -1,0 +1,20 @@
+{
+"model_name_or_path": "google/mt5-small",
+"do_train": true,
+"do_eval": true,
+"source_lang": "de",
+"target_lang": "en",
+"train_file": "../../../../XLdefgen/data/wmt16_de-en_train.json",
+"validation_file": "../../../../XLdefgen/data/wmt16_de-en_val.json",
+"max_source_length": 128,
+"max_target_length": 128,
+"evaluation_strategy": "steps",
+"save_total_limit": 3,
+"report_to": "wandb",
+"output_dir": "test_with_hf_code",
+"per_device_train_batch_size": 2,
+"per_device_eval_batch_size": 2,
+"gradient_accumulation_steps": 1,
+"num_train_epochs": 10,
+"resume_from_checkpoint": true
+}

@@ -1,0 +1,23 @@
+--model_name_or_path	stas/mt5-tiny-random
+
+--train_file		../data/wmt16/wmt16-tiny_train.json
+--validation_file		../data/wmt16/wmt16-tiny_val.json
+
+--source_lang		de
+--target_lang		en
+--max_source_length	64
+--max_target_length	64
+--source_prefix		"translate German to English: "
+--per_device_train_batch_size	1
+--per_device_eval_batch_size 	1
+--log_frequency		100
+--learning_rate		2e-4
+--weight_decay		0.01
+--num_train_epochs	1
+--gradient_accumulation_steps	2
+
+--num_warmup_steps	0
+--output_dir		wandb_run
+--report_to			wandb
+--wandb_proj		wandb_test
+--seed			42
