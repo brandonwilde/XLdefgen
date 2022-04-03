@@ -1,7 +1,8 @@
 --model_name_or_path	google/mt5-small
 
---train_file		../data/codwoe/codwoe_train_en_marked.json
---validation_file		../data/codwoe/codwoe_test_en_marked.json
+--data_task			definition
+--train_file		../data/codwoe/codwoe_train_en_marked3.json
+--validation_file		../data/codwoe/codwoe_val_en_marked3.json
 
 --source_lang		en
 --target_lang		en
@@ -9,7 +10,7 @@
 --max_target_length	64
 --source_prefix		""
 --per_device_train_batch_size	2
---per_device_eval_batch_size 	2
+--per_device_eval_batch_size 	8
 --log_frequency		500
 --learning_rate		2e-4
 --weight_decay		0.01

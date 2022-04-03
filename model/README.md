@@ -5,7 +5,7 @@ Acknowledgement: This script is adapted from Huggingface example code (https://g
 Example usage:
 
 ```bash
-python run_model.py --file train_args_wmt.txt
+python run_model.py --file train_args_codwoe.txt
 ```
 
 OR (for testing on small GPU)
@@ -22,6 +22,7 @@ will override those indicated in the text file.
 --config_name  
 --model_type  
 
+--dataset_task
 --dataset_name  
 --dataset_config_name  
 --train_file  		# CSV and JSON are your options  
