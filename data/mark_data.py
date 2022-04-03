@@ -68,12 +68,17 @@ def main():
     data = pd.read_csv(in_file)
     start_length = len(data)
     
+    print(data)
+    
     def matcher_0(series, lang="en"):
         '''Mark definiendum for exact matches.
         Will still include affixes if present.'''
         
         sent = str(series[lang+'_example'])
         word = str(series[lang+'_word'])
+        
+        # print(word)
+        # print(sent)
         
         # Get start index of match
         match = re.search(word.lower(), sent.lower())
@@ -210,9 +215,11 @@ def main():
     elif args.allow == 2:
         data[args.lang+'_marked'] = data.apply(matcher_2, lang=args.lang, axis=1)
            
+    print(data)
+    
     data_clean = data.dropna()
     end_length = len(data_clean)
-
+    
     print(data_clean)
     print(start_length-end_length, "samples removed due the target word not being found in the example sentence.")
     
@@ -231,14 +238,27 @@ def main():
     #     print()
     
     # Save marked data to JSON file      
-    data_clean.to_json("temp_file.json", orient='records', lines=True)
-   
-    # Add additional dict layer specifying task
-    with open("temp_file.json", 'r') as f:
-        file_lines = [''.join(['{"definition":', line.strip(), "}", '\n']) for line in f.readlines()]
     
+    # data_clean.to_json("temp_file.json", orient='records', lines=True)
+    temp_file = data_clean.to_json(orient='records', lines=True)
+    
+    import json
+    # l = []
+    ds = data_clean.to_dict(orient = 'records')
     with open(args.output_file, 'w') as f:
-        f.writelines(file_lines) 
+        for line in ds:
+            d = {}
+            d["def"] = line
+            f.write(json.dumps(d) + '\n') 
+    #         l.append(d)
+    # json.dumps(l)
+    
+    # Add additional dict layer specifying task
+    # with open("temp_file.json", 'r') as f:
+    #     file_lines = [''.join(['{"definition":', line.strip(), "}", '\n']) for line in f.readlines()]
+    
+    # with open(args.output_file, 'w') as f:
+    #     f.writelines(file_lines) 
     
     print("Marked data saved in", args.output_file)
 
