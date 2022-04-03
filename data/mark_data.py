@@ -240,7 +240,7 @@ def main():
     # Save marked data to JSON file      
     
     # data_clean.to_json("temp_file.json", orient='records', lines=True)
-    temp_file = data_clean.to_json(orient='records', lines=True)
+    # temp_file = data_clean.to_json(orient='records', lines=True)
     
     import json
     # l = []
@@ -249,7 +249,7 @@ def main():
         for line in ds:
             d = {}
             d["definition"] = line
-            f.write(json.dumps(d) + '\n') 
+            f.write(json.dumps(d, sort_keys=True) + '\n') 
     #         l.append(d)
     # json.dumps(l)
     
