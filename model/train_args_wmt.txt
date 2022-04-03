@@ -1,5 +1,6 @@
 --model_name_or_path	google/mt5-small
 
+--data_task			translation
 --train_file		../data/wmt16/wmt16_de-en_train.json
 --validation_file		../data/wmt16/wmt16_de-en_val.json
 

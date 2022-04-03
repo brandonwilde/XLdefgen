@@ -1,5 +1,6 @@
 --model_name_or_path	stas/mt5-tiny-random
 
+--data_task			translation
 --train_file		../data/wmt16/wmt16-tiny_train.json
 --validation_file		../data/wmt16/wmt16-tiny_val.json
 
