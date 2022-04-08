@@ -42,6 +42,8 @@ from transformers import (
 from transformers.file_utils import get_full_repo_name
 from transformers.utils.versions import require_version
 
+from custom_classes import MT5WithXMask
+
 
 logger = logging.getLogger(__name__)
 require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/translation/requirements.txt")
@@ -457,14 +459,14 @@ def main():
         )
 
     if args.model_name_or_path:
-        model = AutoModelForSeq2SeqLM.from_pretrained(
+        model = MT5WithXMask.from_pretrained(
             args.model_name_or_path,
             from_tf=bool(".ckpt" in args.model_name_or_path),
             config=config,
         )
     else:
         logger.info("Training new model from scratch")
-        model = AutoModelForSeq2SeqLM.from_config(config)
+        model = MT5WithXMask.from_config(config)
 
     model.resize_token_embeddings(len(tokenizer))
 
@@ -658,7 +660,7 @@ def main():
     for epoch in range(args.num_train_epochs):
         for train_step, batch in enumerate(train_dataloader):
             model.train()
-            # breakpoint()
+            breakpoint()
             outputs = model(**batch)
             loss = outputs.loss             # Gradient accumulating
             loss = loss / args.gradient_accumulation_steps
@@ -690,7 +692,7 @@ def main():
                     for eval_step, batch in enumerate(eval_dataloader):
                         with torch.no_grad():
                             
-                            # breakpoint()
+                            breakpoint()
                             outputs = model(**batch)
                             loss += outputs.loss             # Gradient accumulating
                             
