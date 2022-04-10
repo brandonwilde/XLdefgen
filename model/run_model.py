@@ -42,7 +42,7 @@ from transformers import (
 from transformers.file_utils import get_full_repo_name
 from transformers.utils.versions import require_version
 
-from custom_classes import (
+from custom_class_and_fxns import (
     MT5WithXMask,
     prepare_for_xattn
     )
@@ -509,8 +509,6 @@ def main():
     source_lang = args.source_lang.split("_")[0]
     target_lang = args.target_lang.split("_")[0]
 
-    padding = "max_length" if args.pad_to_max_length else False #line seems unnecessary
-
     # Temporarily set max_target_length for training.
     max_target_length = args.max_target_length
     padding = "max_length" if args.pad_to_max_length else False
@@ -527,7 +525,7 @@ def main():
         inputs = [ex[input_label] for ex in examples[args.data_task]]
         targets = [ex[target_label] for ex in examples[args.data_task]]
         inputs = [prefix + inp for inp in inputs]
-        model_inputs = tokenizer(inputs, max_length=args.max_source_length, padding=padding, truncation=False)
+        model_inputs = tokenizer(inputs, max_length=args.max_source_length, padding=padding, truncation=True)
 
         # Setup the tokenizer for targets
         with tokenizer.as_target_tokenizer():
@@ -558,9 +556,10 @@ def main():
                                                        len(ex['input_ids']) < args.max_source_length and 
                                                        len(ex['labels']) < max_target_length
                                                        )
+            
         # Add cross-attention mask, remove definiendum span markers
         xattn_datasets = processed_datasets.map(lambda x: prepare_for_xattn(x, tokenizer))
-        # numbers = map(lambda n: setToZeroIfDivisibleBy(n, divisor=3), numbers)
+        
     train_dataset = xattn_datasets["train"]
     eval_dataset = xattn_datasets["validation"]
 

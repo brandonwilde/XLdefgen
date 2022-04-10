@@ -36,45 +36,6 @@ If you do not want to use any `decoder_head_mask` now, please set `decoder_head_
 num_heads)`.
 """
 
-# May need to edit this if train and validation datasets have different data_task
-def preprocess_function(examples,
-                        tokenizer,
-                        data_task,
-                        source_lang,
-                        target_lang,
-                        prefix,
-                        max_source_length,
-                        max_target_length,
-                        padding,
-                        ignore_pad_token_for_loss,
-                        ):
-    
-    input_label = source_lang
-    target_label = target_lang
-
-    if data_task == "definition":
-        input_label += "_marked"
-        target_label += "_gloss"
-
-    inputs = [ex[input_label] for ex in examples[data_task]]
-    targets = [ex[target_label] for ex in examples[data_task]]
-    inputs = [prefix + inp for inp in inputs]
-    model_inputs = tokenizer(inputs, max_length=max_source_length, padding=padding, truncation=False)
-       
-    # Setup the tokenizer for targets
-    with tokenizer.as_target_tokenizer():
-        labels = tokenizer(targets, max_length=max_target_length, padding=padding, truncation=True)
-
-    # If we are padding here, replace all tokenizer.pad_token_id in the labels by -100 when we want to ignore
-    # padding in the loss.
-    if padding == "max_length" and ignore_pad_token_for_loss:
-        labels["input_ids"] = [
-            [(l if l != tokenizer.pad_token_id else -100) for l in label] for label in labels["input_ids"]
-        ]
-
-    model_inputs["labels"] = labels["input_ids"]
-    
-    return model_inputs
 
 
 def remove_def_markers(example, def_span_indices):
