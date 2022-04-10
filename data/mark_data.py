@@ -97,7 +97,7 @@ def main():
             except:
                 end = len(sent)
                 
-            return sent[:start]+'*'+sent[start:end]+'*'+sent[end:]
+            return sent[:start]+'<MASK> '+sent[start:end]+' <MASK>'+sent[end:]
         
         else: # No match
             return np.nan

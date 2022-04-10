@@ -28,6 +28,95 @@ from transformers.modeling_outputs import (
 #     replace_return_docstrings,
 # )
 
+# Warning messafe for FutureWarning: head_mask was separated into two input args - head_mask, decoder_head_mask
+__HEAD_MASK_WARNING_MSG = """
+The input argument `head_mask` was split into two arguments `head_mask` and `decoder_head_mask`. Currently,
+`decoder_head_mask` is set to copy `head_mask`, but this feature is deprecated and will be removed in future versions.
+If you do not want to use any `decoder_head_mask` now, please set `decoder_head_mask = torch.ones(num_layers,
+num_heads)`.
+"""
+
+# May need to edit this if train and validation datasets have different data_task
+def preprocess_function(examples,
+                        tokenizer,
+                        data_task,
+                        source_lang,
+                        target_lang,
+                        prefix,
+                        max_source_length,
+                        max_target_length,
+                        padding,
+                        ignore_pad_token_for_loss,
+                        ):
+    
+    input_label = source_lang
+    target_label = target_lang
+
+    if data_task == "definition":
+        input_label += "_marked"
+        target_label += "_gloss"
+
+    inputs = [ex[input_label] for ex in examples[data_task]]
+    targets = [ex[target_label] for ex in examples[data_task]]
+    inputs = [prefix + inp for inp in inputs]
+    model_inputs = tokenizer(inputs, max_length=max_source_length, padding=padding, truncation=False)
+       
+    # Setup the tokenizer for targets
+    with tokenizer.as_target_tokenizer():
+        labels = tokenizer(targets, max_length=max_target_length, padding=padding, truncation=True)
+
+    # If we are padding here, replace all tokenizer.pad_token_id in the labels by -100 when we want to ignore
+    # padding in the loss.
+    if padding == "max_length" and ignore_pad_token_for_loss:
+        labels["input_ids"] = [
+            [(l if l != tokenizer.pad_token_id else -100) for l in label] for label in labels["input_ids"]
+        ]
+
+    model_inputs["labels"] = labels["input_ids"]
+    
+    return model_inputs
+
+
+def remove_def_markers(example, def_span_indices):
+    """
+    Remove all definiendum span markers from the dataset.
+    """
+    begin,end = def_span_indices
+    example['input_ids'].pop(end)
+    example['input_ids'].pop(begin)
+    example['attention_mask'].pop(end)
+    example['attention_mask'].pop(begin)
+    example['cross_attention_mask'].pop(end)
+    example['cross_attention_mask'].pop(begin)
+    
+    return example
+
+
+def prepare_for_xattn(example, tokenizer):
+    """
+    Add cross-attention mask and remove temporary definiendum span markers
+    from the data.
+    """
+    def_ids = tokenizer.convert_tokens_to_ids(["<MASK>", " <MASK>"])
+    def_indices = []
+    sent = example['input_ids']
+    for i, token_id in enumerate(sent):
+        if token_id in def_ids:
+            def_indices.append(i)
+    assert len(def_indices) == 2, "Definiendum span not found. def_indices should consist of two integers but is instead " + str(def_indices) + " (" + str(len(sent)) + ")\n" + tokenizer.decode(sent)
+    begin,end = def_indices
+    
+    # Mask everything except for definiendum
+    cross_attention_mask = [0]*len(sent)
+    cross_attention_mask[begin:end] = [1]*(end-begin)
+    example['cross_attention_mask'] = cross_attention_mask
+    
+    # Remove definiendum markers
+    example = remove_def_markers(example, def_indices)
+    
+    return example
+
+
 _CONFIG_FOR_DOC = "T5Config"
 
 class MT5WithXMask(MT5ForConditionalGeneration):
@@ -182,3 +271,4 @@ class MT5WithXMask(MT5ForConditionalGeneration):
             encoder_hidden_states=encoder_outputs.hidden_states,
             encoder_attentions=encoder_outputs.attentions,
         )
+    
