@@ -100,9 +100,11 @@ def prepare_for_xattn(example, tokenizer):
     def_ids = tokenizer.convert_tokens_to_ids(["<MASK>", " <MASK>"])
     def_indices = []
     sent = example['input_ids']
+    
     for i, token_id in enumerate(sent):
         if token_id in def_ids:
             def_indices.append(i)
+            
     assert len(def_indices) == 2, "Definiendum span not found. def_indices should consist of two integers but is instead " + str(def_indices) + " (" + str(len(sent)) + ")\n" + tokenizer.decode(sent)
     begin,end = def_indices
     

@@ -470,7 +470,12 @@ def main():
     else:
         logger.info("Training new model from scratch")
         model = MT5WithXMask.from_config(config)
-
+    
+    # These special tokens are normally used for specific training objectives,
+    # but we're not using them that way here. These are being used as temporary
+    # markers to demarcate the where the definiendum is.
+    special_tokens_dict = {"mask_token": " <MASK>", "sep_token": "<MASK>"}
+    tokenizer.add_special_tokens(special_tokens_dict)
     model.resize_token_embeddings(len(tokenizer))
 
     # Set decoder_start_token_id to the the language code of the target language (!)
@@ -516,7 +521,7 @@ def main():
         target_label = target_lang
         
         if args.data_task == "definition":
-            input_label += "_example"
+            input_label += "_marked"
             target_label += "_gloss"
             
         inputs = [ex[input_label] for ex in examples[args.data_task]]
