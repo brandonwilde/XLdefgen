@@ -6,10 +6,13 @@ Created on Fri Apr  8 07:39:20 2022
 """
 
 import warnings
-from typing import Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
+
 import torch
 from torch.nn import CrossEntropyLoss
-from transformers import MT5ForConditionalGeneration
+from transformers.file_utils import PaddingStrategy
+from transformers.tokenization_utils_base import BatchEncoding
+from transformers import MT5ForConditionalGeneration, T5Tokenizer
 
 from transformers.modeling_outputs import (
     BaseModelOutput,
@@ -17,6 +20,8 @@ from transformers.modeling_outputs import (
     Seq2SeqLMOutput,
     Seq2SeqModelOutput,
 )
+
+EncodedInput = List[int]
 
 # from transformers.utils import (
 #     DUMMY_INPUTS,
@@ -35,6 +40,8 @@ The input argument `head_mask` was split into two arguments `head_mask` and `dec
 If you do not want to use any `decoder_head_mask` now, please set `decoder_head_mask = torch.ones(num_layers,
 num_heads)`.
 """
+
+_CONFIG_FOR_DOC = "T5Config"
 
 
 
@@ -80,7 +87,101 @@ def prepare_for_xattn(example, tokenizer):
     return example
 
 
-_CONFIG_FOR_DOC = "T5Config"
+class TokenizerWithXMask(T5Tokenizer):
+    """
+    This updates the T5Tokenizer to also perform dynamic padding of provided
+    cross_attention_masks (inside the collater fxn).
+    """
+
+    def _pad(
+            self,
+            encoded_inputs: Union[Dict[str, EncodedInput], BatchEncoding],
+            max_length: Optional[int] = None,
+            padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
+            pad_to_multiple_of: Optional[int] = None,
+            return_attention_mask: Optional[bool] = None,
+            return_xattn_mask: Optional[bool] = None,
+        ) -> dict:
+            """
+            Pad encoded inputs (on left/right and up to predefined length or max length in the batch)
+            Args:
+                encoded_inputs:
+                    Dictionary of tokenized inputs (`List[int]`) or batch of tokenized inputs (`List[List[int]]`).
+                max_length: maximum length of the returned list and optionally padding length (see below).
+                    Will truncate by taking into account the special tokens.
+                padding_strategy: PaddingStrategy to use for padding.
+                    - PaddingStrategy.LONGEST Pad to the longest sequence in the batch
+                    - PaddingStrategy.MAX_LENGTH: Pad to the max length (default)
+                    - PaddingStrategy.DO_NOT_PAD: Do not pad
+                    The tokenizer padding sides are defined in self.padding_side:
+                        - 'left': pads on the left of the sequences
+                        - 'right': pads on the right of the sequences
+                pad_to_multiple_of: (optional) Integer if set will pad the sequence to a multiple of the provided value.
+                    This is especially useful to enable the use of Tensor Core on NVIDIA hardware with compute capability
+                    >= 7.5 (Volta).
+                return_attention_mask:
+                    (optional) Set to False to avoid returning attention mask (default: set to model specifics)
+            """
+            # Load from model defaults
+            if return_attention_mask is None:
+                return_attention_mask = "attention_mask" in self.model_input_names
+            
+            # if return_xattn_mask is None:
+            #     return_xattn_mask = "cross_attention_mask" in self.model_input_names
+            #     print("return_xattn_mask =", return_xattn_mask)
+    
+            required_input = encoded_inputs[self.model_input_names[0]]
+    
+            if padding_strategy == PaddingStrategy.LONGEST:
+                max_length = len(required_input)
+    
+            if max_length is not None and pad_to_multiple_of is not None and (max_length % pad_to_multiple_of != 0):
+                max_length = ((max_length // pad_to_multiple_of) + 1) * pad_to_multiple_of
+    
+            needs_to_be_padded = padding_strategy != PaddingStrategy.DO_NOT_PAD and len(required_input) != max_length
+    
+            # Initialize attention mask if not present.
+            if return_attention_mask and "attention_mask" not in encoded_inputs:
+                encoded_inputs["attention_mask"] = [1] * len(required_input)
+                
+            # if return_xattn_mask and "cross_attention_mask" not in encoded_inputs:
+            #     encoded_inputs["cross_attention_mask"] = [1] * len(required_input)
+    
+            if needs_to_be_padded:
+                difference = max_length - len(required_input)
+    
+                if self.padding_side == "right":
+                    if return_attention_mask:
+                        encoded_inputs["attention_mask"] = encoded_inputs["attention_mask"] + [0] * difference
+                    
+                    if "cross_attention_mask" in encoded_inputs:
+                        encoded_inputs["cross_attention_mask"] = encoded_inputs["cross_attention_mask"] + [0] * difference
+                        # print("Xattn after padding (", len(encoded_inputs["cross_attention_mask"]), ")")
+                        # print(encoded_inputs["cross_attention_mask"])
+                        # print()
+                    if "token_type_ids" in encoded_inputs:
+                        encoded_inputs["token_type_ids"] = (
+                            encoded_inputs["token_type_ids"] + [self.pad_token_type_id] * difference
+                        )
+                    if "special_tokens_mask" in encoded_inputs:
+                        encoded_inputs["special_tokens_mask"] = encoded_inputs["special_tokens_mask"] + [1] * difference
+                    encoded_inputs[self.model_input_names[0]] = required_input + [self.pad_token_id] * difference
+                elif self.padding_side == "left":
+                    if return_attention_mask:
+                        encoded_inputs["attention_mask"] = [0] * difference + encoded_inputs["attention_mask"]
+                    if "token_type_ids" in encoded_inputs:
+                        encoded_inputs["token_type_ids"] = [self.pad_token_type_id] * difference + encoded_inputs[
+                            "token_type_ids"
+                        ]
+                    if "special_tokens_mask" in encoded_inputs:
+                        encoded_inputs["special_tokens_mask"] = [1] * difference + encoded_inputs["special_tokens_mask"]
+                    encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
+                else:
+                    raise ValueError("Invalid padding strategy:" + str(self.padding_side))
+            # print("Encoded inputs:", encoded_inputs)
+            # print()
+            return encoded_inputs
+
 
 class MT5WithXMask(MT5ForConditionalGeneration):
     """
