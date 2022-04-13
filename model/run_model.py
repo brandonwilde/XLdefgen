@@ -42,7 +42,7 @@ from transformers import (
 from transformers.file_utils import get_full_repo_name
 from transformers.utils.versions import require_version
 
-from custom_class_and_fxns import (
+from custom_classes_and_fxns import (
     TokenizerWithXMask,
     MT5WithXMask,
     prepare_for_xattn
@@ -461,7 +461,9 @@ def main():
             "You are instantiating a new tokenizer from scratch. This is not supported by this script."
             "You can do it from another script, save it, and load it from here, using --tokenizer_name."
         )
-
+    
+    print("Vocab size:", len(tokenizer))
+    
     if args.model_name_or_path:
         model = MT5WithXMask.from_pretrained(
             args.model_name_or_path,
@@ -473,11 +475,13 @@ def main():
         model = MT5WithXMask.from_config(config)
     
     # These special tokens are normally used for specific training objectives,
-    # but we're not using them that way here. These are being used as temporary
+    # but we're not using them that way here. These are being used as TEMPORARY
     # markers to demarcate the where the definiendum is.
-    special_tokens_dict = {"mask_token": " <MASK>", "sep_token": "<MASK>"}
+    # Make sure to mark definienda with these tokens prior to running the model.
+    special_tokens_dict = {"mask_token": "<MASK>", "sep_token": " <MASK>"}
     tokenizer.add_special_tokens(special_tokens_dict)
-    model.resize_token_embeddings(len(tokenizer))
+    # model.resize_token_embeddings(len(tokenizer))
+    print("Vocab size:", len(tokenizer))
 
     # Set decoder_start_token_id to the the language code of the target language (!)
     if model.config.decoder_start_token_id is None and isinstance(tokenizer, (MBartTokenizer, MBartTokenizerFast)):
@@ -548,7 +552,8 @@ def main():
             batched=True,
             num_proc=args.preprocessing_num_workers,
             remove_columns=column_names,
-            load_from_cache_file=not args.overwrite_cache,
+            # load_from_cache_file=not args.overwrite_cache,
+            load_from_cache_file=False,
             desc="Running tokenizer on dataset",
         )
         
@@ -559,10 +564,22 @@ def main():
                                                        )
             
         # Add cross-attention mask, remove definiendum span markers
-        xattn_datasets = processed_datasets.map(lambda x: prepare_for_xattn(x, tokenizer))
+        xattn_datasets = processed_datasets.map(lambda x:
+                                                prepare_for_xattn(x, tokenizer),
+                                                desc="Adding cross-attention mask")
         
     train_dataset = xattn_datasets["train"]
     eval_dataset = xattn_datasets["validation"]
+    print("Num eval examples: ", eval_dataset)
+    examp = eval_dataset[-1]
+    examp_full = zip(tokenizer.convert_ids_to_tokens(examp['input_ids']),
+                examp['input_ids'],
+                examp['attention_mask'],
+                examp['cross_attention_mask']
+                )
+    for tok in examp_full:
+        print("Eval example:", tok)
+    print()
 
     # Log a few random samples from the training set:
 #     for index in random.sample(range(len(train_dataset)), 3):
@@ -696,6 +713,8 @@ def main():
                 if completed_steps % args.log_frequency == 0 or train_step == len(train_dataloader) - 1:    # Evaluate by spec. frequency
                     model.eval()
                     loss = 0
+                    
+                    print("Num eval batches:", len(eval_dataloader))
             
                     if args.val_max_target_length is None:
                         args.val_max_target_length = args.max_target_length
@@ -742,8 +761,10 @@ def main():
     
                             metric.add_batch(predictions=decoded_preds, references=decoded_labels)
                     print("Epochs completed:", epoch+(train_step+1)/len(train_dataloader))
-                    print(decoded_preds)
-                    print(decoded_labels)
+                    for pred in zip(decoded_preds, decoded_labels):
+                        print()
+                        print("Pred: ", pred[0])
+                        print("Actual: ", pred[1])
                     val_loss = loss/len(eval_dataloader)
                     val_ppl = round(math.exp(val_loss),4)
                     eval_metric = metric.compute()
