@@ -42,6 +42,12 @@ from transformers import (
 from transformers.file_utils import get_full_repo_name
 from transformers.utils.versions import require_version
 
+from custom_classes_and_fxns import (
+    TokenizerWithXMask,
+    MT5WithXMask,
+    prepare_for_xattn
+    )
+
 
 logger = logging.getLogger(__name__)
 require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/translation/requirements.txt")
@@ -449,24 +455,33 @@ def main():
     if args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name, use_fast=not args.use_slow_tokenizer)
     elif args.model_name_or_path:
-        tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=not args.use_slow_tokenizer)
+        tokenizer = TokenizerWithXMask.from_pretrained(args.model_name_or_path, use_fast=not args.use_slow_tokenizer)
     else:
         raise ValueError(
             "You are instantiating a new tokenizer from scratch. This is not supported by this script."
             "You can do it from another script, save it, and load it from here, using --tokenizer_name."
         )
-
+    
+    print("Vocab size:", len(tokenizer))
+    
     if args.model_name_or_path:
-        model = AutoModelForSeq2SeqLM.from_pretrained(
+        model = MT5WithXMask.from_pretrained(
             args.model_name_or_path,
             from_tf=bool(".ckpt" in args.model_name_or_path),
             config=config,
         )
     else:
         logger.info("Training new model from scratch")
-        model = AutoModelForSeq2SeqLM.from_config(config)
-
-    model.resize_token_embeddings(len(tokenizer))
+        model = MT5WithXMask.from_config(config)
+    
+    # These special tokens are normally used for specific training objectives,
+    # but we're not using them that way here. These are being used as TEMPORARY
+    # markers to demarcate the where the definiendum is.
+    # Make sure to mark definienda with these tokens prior to running the model.
+    special_tokens_dict = {"mask_token": "<MASK>", "sep_token": " <MASK>"}
+    tokenizer.add_special_tokens(special_tokens_dict)
+    # model.resize_token_embeddings(len(tokenizer))
+    print("Vocab size:", len(tokenizer))
 
     # Set decoder_start_token_id to the the language code of the target language (!)
     if model.config.decoder_start_token_id is None and isinstance(tokenizer, (MBartTokenizer, MBartTokenizerFast)):
@@ -499,8 +514,6 @@ def main():
     source_lang = args.source_lang.split("_")[0]
     target_lang = args.target_lang.split("_")[0]
 
-    padding = "max_length" if args.pad_to_max_length else False #line seems unnecessary
-
     # Temporarily set max_target_length for training.
     max_target_length = args.max_target_length
     padding = "max_length" if args.pad_to_max_length else False
@@ -511,7 +524,7 @@ def main():
         target_label = target_lang
         
         if args.data_task == "definition":
-            input_label += "_example"
+            input_label += "_marked"
             target_label += "_gloss"
             
         inputs = [ex[input_label] for ex in examples[args.data_task]]
@@ -539,12 +552,34 @@ def main():
             batched=True,
             num_proc=args.preprocessing_num_workers,
             remove_columns=column_names,
-            load_from_cache_file=not args.overwrite_cache,
+            # load_from_cache_file=not args.overwrite_cache,
+            load_from_cache_file=False,
             desc="Running tokenizer on dataset",
         )
-
-    train_dataset = processed_datasets["train"]
-    eval_dataset = processed_datasets["validation"]
+        
+        # Filter out inputs that are too long (rather than truncate)
+        processed_datasets = processed_datasets.filter(lambda ex:
+                                                       len(ex['input_ids']) < args.max_source_length and 
+                                                       len(ex['labels']) < max_target_length
+                                                       )
+            
+        # Add cross-attention mask, remove definiendum span markers
+        xattn_datasets = processed_datasets.map(lambda x:
+                                                prepare_for_xattn(x, tokenizer),
+                                                desc="Adding cross-attention mask")
+        
+    train_dataset = xattn_datasets["train"]
+    eval_dataset = xattn_datasets["validation"]
+    print("Num eval examples: ", eval_dataset)
+    examp = eval_dataset[-1]
+    examp_full = zip(tokenizer.convert_ids_to_tokens(examp['input_ids']),
+                examp['input_ids'],
+                examp['attention_mask'],
+                examp['cross_attention_mask']
+                )
+    for tok in examp_full:
+        print("Eval example:", tok)
+    print()
 
     # Log a few random samples from the training set:
 #     for index in random.sample(range(len(train_dataset)), 3):
@@ -658,7 +693,6 @@ def main():
     for epoch in range(args.num_train_epochs):
         for train_step, batch in enumerate(train_dataloader):
             model.train()
-            # breakpoint()
             outputs = model(**batch)
             loss = outputs.loss             # Gradient accumulating
             loss = loss / args.gradient_accumulation_steps
@@ -679,6 +713,8 @@ def main():
                 if completed_steps % args.log_frequency == 0 or train_step == len(train_dataloader) - 1:    # Evaluate by spec. frequency
                     model.eval()
                     loss = 0
+                    
+                    print("Num eval batches:", len(eval_dataloader))
             
                     if args.val_max_target_length is None:
                         args.val_max_target_length = args.max_target_length
@@ -690,7 +726,6 @@ def main():
                     for eval_step, batch in enumerate(eval_dataloader):
                         with torch.no_grad():
                             
-                            # breakpoint()
                             outputs = model(**batch)
                             loss += outputs.loss             # Gradient accumulating
                             
@@ -726,8 +761,10 @@ def main():
     
                             metric.add_batch(predictions=decoded_preds, references=decoded_labels)
                     print("Epochs completed:", epoch+(train_step+1)/len(train_dataloader))
-                    print(decoded_preds)
-                    print(decoded_labels)
+                    for pred in zip(decoded_preds, decoded_labels):
+                        print()
+                        print("Pred: ", pred[0])
+                        print("Actual: ", pred[1])
                     val_loss = loss/len(eval_dataloader)
                     val_ppl = round(math.exp(val_loss),4)
                     eval_metric = metric.compute()

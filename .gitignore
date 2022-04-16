@@ -2,3 +2,4 @@
 *.pdf
 *.docx
 /defgen_readings
+/model/__pycache__
