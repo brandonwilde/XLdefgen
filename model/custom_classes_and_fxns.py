@@ -66,7 +66,7 @@ def prepare_for_xattn(example, tokenizer):
     from the data.
     """
     # Only definiendum span and eos_token will be unmasked for cross-attention
-    def_ids = tokenizer.convert_tokens_to_ids(["<MASK>", " <MASK>", tokenizer.eos_token])
+    def_ids = tokenizer.convert_tokens_to_ids(["<extra_id_99>", tokenizer.eos_token])
     def_indices = []
     sent = example['input_ids']
     
