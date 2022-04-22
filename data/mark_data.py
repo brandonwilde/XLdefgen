@@ -51,8 +51,20 @@ def parse_args():
     parser.add_argument(
         "--demarcator",
         type=str,
-        default=None,
+        default="*",
         help="The string or symbol that should be used to demarcate the definiendum.",
+    )
+
+    parser.add_argument(
+        "--mark",
+        action="store_true",
+        help="If passed, will demarcate definiendum within example sentence.",
+    )
+    
+    parser.add_argument(
+        "--prepend",
+        action="store_true",
+        help="If passed, will prepend definiendum to example/marked sentence.",
     )
 
     args = parser.parse_args()
@@ -92,7 +104,7 @@ def matcher_0(series, lang="en", demarcator="*"):
         except:
             end = len(sent)
             
-        return sent[:start]+demarcator+' '+sent[start:end]+' '+demarcator+sent[end:]
+        return sent[:start]+' '+demarcator+' '+sent[start:end]+' '+demarcator+' '+sent[end:]
     
     else: # No match
         return np.nan
@@ -216,16 +228,22 @@ def main():
     start_length = len(data)
     
     print(data)
-            
-    if args.allow == 0:
-        data[args.lang+'_marked'] = data.apply(matcher_0, lang=args.lang, demarcator=args.demarcator, axis=1)
-    elif args.allow == 1:
-        data[args.lang+'_marked'] = data.apply(matcher_1, lang=args.lang, demarcator=args.demarcator, axis=1)
-    elif args.allow == 2:
-        data[args.lang+'_marked'] = data.apply(matcher_2, lang=args.lang, demarcator=args.demarcator, axis=1)
-           
-    print(data)
     
+    # Set default column for concatenation
+    concat_col = args.lang + "_example"
+    
+    if args.mark:     
+        if args.allow == 0:
+            data[args.lang+'_marked'] = data.apply(matcher_0, lang=args.lang, demarcator=args.demarcator, axis=1)
+        elif args.allow == 1:
+            data[args.lang+'_marked'] = data.apply(matcher_1, lang=args.lang, demarcator=args.demarcator, axis=1)
+        elif args.allow == 2:
+            data[args.lang+'_marked'] = data.apply(matcher_2, lang=args.lang, demarcator=args.demarcator, axis=1)
+        concat_col = args.lang + "_marked"
+    
+    if args.prepend:
+        data[args.lang+'_prepend'] = data.apply(lambda x: x[args.lang+'_word'] + '. ' + x[concat_col], axis=1)
+            
     data_clean = data.dropna()
     end_length = len(data_clean)
     
