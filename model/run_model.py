@@ -478,8 +478,10 @@ def main():
     # but we're not using them that way here. These are being used as TEMPORARY
     # markers to demarcate the where the definiendum is.
     # Make sure to mark definienda with these tokens prior to running the model.
-    special_tokens_dict = {"mask_token": "<MASK>", "sep_token": " <MASK>"}
-    tokenizer.add_special_tokens(special_tokens_dict)
+ 
+    # special_tokens_dict = {"mask_token": "<MASK>", "sep_token": " <MASK>"}
+    # tokenizer.add_special_tokens(special_tokens_dict)
+    
     # model.resize_token_embeddings(len(tokenizer))
     print("Vocab size:", len(tokenizer))
 
@@ -733,6 +735,8 @@ def main():
                                 batch["input_ids"],
                                 attention_mask=batch["attention_mask"],
                                 **gen_kwargs,
+                                no_repeat_ngram_size=3,
+                                early_stopping=True,
                                 return_dict_in_generate=True,
                                 output_scores=True
                             )
