@@ -24,7 +24,7 @@ def parse_args():
         "--input_file",
         type=str,
         default=None,
-        help="The language to create marked sentences in.",
+        help="The file holding the data to be marked.",
     )
     
     parser.add_argument(
@@ -48,6 +48,13 @@ def parse_args():
         help="The language to create marked sentences in.",
     )
 
+    parser.add_argument(
+        "--demarcator",
+        type=str,
+        default=None,
+        help="The string or symbol that should be used to demarcate the definiendum.",
+    )
+
     args = parser.parse_args()
     
     assert args.allow in [0,1,2], "Allowable MED must be 0, 1, or 2."
@@ -55,32 +62,73 @@ def parse_args():
 
     return args
 
+# Input args to specify train/val/test split - which should be included
+# and how much data to put in each split
 
-def main():
-    # Parse the arguments
-    args = parse_args()
+def matcher_0(series, lang="en", demarcator="*"):
+    '''Mark definiendum for exact matches.
+    Will still include affixes if present.'''
     
-    if args.input_file is None: # If not running from command line
-        in_file = "C:/Users/brand/Documents/Projects/XLdefgen/data/codwoe_train_en.csv"
-    else:
-        in_file = args.input_file
-        
-    data = pd.read_csv(in_file)
-    start_length = len(data)
+    sent = str(series[lang+'_example'])
+    word = str(series[lang+'_word'])
     
-    print(data)
+    # print(word)
+    # print(sent)
     
-    def matcher_0(series, lang="en"):
-        '''Mark definiendum for exact matches.
-        Will still include affixes if present.'''
+    # Get start index of match
+    match = re.search(word.lower(), sent.lower())
+    if match:
         
-        sent = str(series[lang+'_example'])
-        word = str(series[lang+'_word'])
+        b_match = match.span()[0]+1
+        e_match = match.span()[1]-1
         
-        # print(word)
-        # print(sent)
+        try:    # Get start index of word (may need to account for prefix)
+            start = b_match - re.search('\W', sent[:b_match][::-1]).span()[0]
+        except:
+            start = 0
         
-        # Get start index of match
+        try:    # Get end index of match (may need to account for suffixes)
+            end = e_match + re.search('\W', sent[e_match:]).span()[0]
+        except:
+            end = len(sent)
+            
+        return sent[:start]+demarcator+' '+sent[start:end]+' '+demarcator+sent[end:]
+    
+    else: # No match
+        return np.nan
+
+
+def matcher_1(series, lang="en", demarcator="*"):
+    """Mark definiendum for fuzzy matches.
+    Allows up to one 'error' per match."""
+           
+    sent = str(series[lang+'_example'])
+    word = str(series[lang+'_word'])
+    
+    if len(word) > 4:
+        match = re.search("(?b)(" + word.lower() + "){e<=1}", sent.lower())
+
+        if match:
+            
+            b_match = match.span()[0]+1
+            e_match = match.span()[1]-1
+            
+            try:    # Get start index of word (may need to account for prefix)
+                start = b_match - re.search('\W', sent[:b_match][::-1]).span()[0]
+            except:
+                start = 0
+            
+            try:    # Get end index of match (may need to account for suffixes)
+                end = e_match + re.search('\W', sent[e_match:]).span()[0]
+            except:
+                end = len(sent)
+                
+            return sent[:start]+demarcator+' '+sent[start:end]+' '+demarcator+sent[end:]
+        
+        else: # No match
+            return np.nan
+    
+    else: # short word needs exact match
         match = re.search(word.lower(), sent.lower())
         if match:
             
@@ -97,123 +145,84 @@ def main():
             except:
                 end = len(sent)
                 
-            return sent[:start]+'<MASK> '+sent[start:end]+' <MASK>'+sent[end:]
+            return sent[:start]+demarcator+' '+sent[start:end]+' '+demarcator+sent[end:]
+        
+        else: # No match
+            return np.nan
+        
+def matcher_2(series, lang="en", demarcator="*"): # This seems to let in too many false positive matches (about half of the 67 added)
+    """Mark definiendum for fuzzy matches.
+    Allows up to two 'errors' per match."""
+            
+    sent = str(series[lang+'_example'])
+    word = str(series[lang+'_word'])
+    
+    if len(word) > 4:
+        match = re.search("(?b)(" + word.lower() + "){e<=2}", sent.lower())
+
+        if match:
+            
+            b_match = match.span()[0]+1
+            e_match = match.span()[1]-1
+            
+            try:    # Get start index of word (may need to account for prefix)
+                start = b_match - re.search('\W', sent[:b_match][::-1]).span()[0]
+            except:
+                start = 0
+            
+            try:    # Get end index of match (may need to account for suffixes)
+                end = e_match + re.search('\W', sent[e_match:]).span()[0]
+            except:
+                end = len(sent)
+                
+            return sent[:start]+demarcator+' '+sent[start:end]+' '+demarcator+sent[end:]
         
         else: # No match
             return np.nan
     
-    
-    def matcher_1(series, lang="en"):
-        """Mark definiendum for fuzzy matches.
-        Allows up to one 'error' per match."""
-               
-        sent = str(series[lang+'_example'])
-        word = str(series[lang+'_word'])
+    else: # short word needs exact match
+        match = re.search(word.lower(), sent.lower())
+        if match:
+            
+            b_match = match.span()[0]+1
+            e_match = match.span()[1]-1
+            
+            try:    # Get start index of word (may need to account for prefix)
+                start = b_match - re.search('\W', sent[:b_match][::-1]).span()[0]
+            except:
+                start = 0
+            
+            try:    # Get end index of match (may need to account for suffixes)
+                end = e_match + re.search('\W', sent[e_match:]).span()[0]
+            except:
+                end = len(sent)
+                
+            return sent[:start]+demarcator+' '+sent[start:end]+' '+demarcator+sent[end:]
         
-        if len(word) > 4:
-            match = re.search("(?b)(" + word.lower() + "){e<=1}", sent.lower())
+        else: # No match
+            return np.nan
+
+
+def main():
+    # Parse the arguments
+    args = parse_args()
     
-            if match:
-                
-                b_match = match.span()[0]+1
-                e_match = match.span()[1]-1
-                
-                try:    # Get start index of word (may need to account for prefix)
-                    start = b_match - re.search('\W', sent[:b_match][::-1]).span()[0]
-                except:
-                    start = 0
-                
-                try:    # Get end index of match (may need to account for suffixes)
-                    end = e_match + re.search('\W', sent[e_match:]).span()[0]
-                except:
-                    end = len(sent)
-                    
-                return sent[:start]+'*'+sent[start:end]+'*'+sent[end:]
-            
-            else: # No match
-                return np.nan
+    if args.input_file is None: # If not running from command line
+        in_file = "C:/Users/brand/Documents/Projects/XLdefgen/data/codwoe_train_en.csv"
+    else:
+        in_file = args.input_file
         
-        else: # short word needs exact match
-            match = re.search(word.lower(), sent.lower())
-            if match:
-                
-                b_match = match.span()[0]+1
-                e_match = match.span()[1]-1
-                
-                try:    # Get start index of word (may need to account for prefix)
-                    start = b_match - re.search('\W', sent[:b_match][::-1]).span()[0]
-                except:
-                    start = 0
-                
-                try:    # Get end index of match (may need to account for suffixes)
-                    end = e_match + re.search('\W', sent[e_match:]).span()[0]
-                except:
-                    end = len(sent)
-                    
-                return sent[:start]+'*'+sent[start:end]+'*'+sent[end:]
-            
-            else: # No match
-                return np.nan
-            
-    def matcher_2(series, lang="en"): # This seems to let in too many false positive matches (about half of the 67 added)
-        """Mark definiendum for fuzzy matches.
-        Allows up to two 'errors' per match."""
-                
-        sent = str(series[lang+'_example'])
-        word = str(series[lang+'_word'])
-        
-        if len(word) > 4:
-            match = re.search("(?b)(" + word.lower() + "){e<=2}", sent.lower())
+    data = pd.read_csv(in_file)
+    start_length = len(data)
     
-            if match:
-                
-                b_match = match.span()[0]+1
-                e_match = match.span()[1]-1
-                
-                try:    # Get start index of word (may need to account for prefix)
-                    start = b_match - re.search('\W', sent[:b_match][::-1]).span()[0]
-                except:
-                    start = 0
-                
-                try:    # Get end index of match (may need to account for suffixes)
-                    end = e_match + re.search('\W', sent[e_match:]).span()[0]
-                except:
-                    end = len(sent)
-                    
-                return sent[:start]+'*'+sent[start:end]+'*'+sent[end:]
-            
-            else: # No match
-                return np.nan
-        
-        else: # short word needs exact match
-            match = re.search(word.lower(), sent.lower())
-            if match:
-                
-                b_match = match.span()[0]+1
-                e_match = match.span()[1]-1
-                
-                try:    # Get start index of word (may need to account for prefix)
-                    start = b_match - re.search('\W', sent[:b_match][::-1]).span()[0]
-                except:
-                    start = 0
-                
-                try:    # Get end index of match (may need to account for suffixes)
-                    end = e_match + re.search('\W', sent[e_match:]).span()[0]
-                except:
-                    end = len(sent)
-                    
-                return sent[:start]+'*'+sent[start:end]+'*'+sent[end:]
-            
-            else: # No match
-                return np.nan
-    
+    print(data)
             
     if args.allow == 0:
-        data[args.lang+'_marked'] = data.apply(matcher_0, lang=args.lang, axis=1)
+        data[args.lang+'_marked'] = data.apply(matcher_0, lang=args.lang, demarcator=args.demarcator, axis=1)
     elif args.allow == 1:
-        data[args.lang+'_marked'] = data.apply(matcher_1, lang=args.lang, axis=1)
+        data[args.lang+'_marked'] = data.apply(matcher_1, lang=args.lang, demarcator=args.demarcator, axis=1)
     elif args.allow == 2:
-        data[args.lang+'_marked'] = data.apply(matcher_2, lang=args.lang, axis=1)
+        data[args.lang+'_marked'] = data.apply(matcher_2, lang=args.lang, demarcator=args.demarcator, axis=1)
            
     print(data)
     
@@ -249,7 +258,7 @@ def main():
         for line in ds:
             d = {}
             d["definition"] = line
-            f.write(json.dumps(d, sort_keys=True) + '\n') 
+            f.write(json.dumps(d, sort_keys=False) + '\n') 
     #         l.append(d)
     # json.dumps(l)
     
