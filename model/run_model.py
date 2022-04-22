@@ -347,6 +347,13 @@ def parse_args():
         default="definition",
         help="Specify what kind of data is being used. Should be translation or definition."
     )
+    parser.add_argument(
+        "--mask_context",
+        type=bool,
+        default=True,
+        help="Whether or not to use a cross-attention mask during decoding."
+    )
+    
     args = parser.parse_args()
 
     # Sanity checks
@@ -566,28 +573,26 @@ def main():
                                                        )
             
         # Add cross-attention mask, remove definiendum span markers
-        xattn_datasets = processed_datasets.map(lambda x:
-                                                prepare_for_xattn(x, tokenizer),
-                                                desc="Adding cross-attention mask")
+        # processed_datasets = processed_datasets.map(lambda x:
+        #                                         prepare_for_xattn(x, tokenizer),
+        #                                         desc="Adding cross-attention mask")
         
-    train_dataset = xattn_datasets["train"]
-    eval_dataset = xattn_datasets["validation"]
+    train_dataset = processed_datasets["train"]
+    eval_dataset = processed_datasets["validation"]
     print("Num eval examples: ", eval_dataset)
-    examp = eval_dataset[-1]
-    examp_full = zip(tokenizer.convert_ids_to_tokens(examp['input_ids']),
-                examp['input_ids'],
-                examp['attention_mask'],
-                examp['cross_attention_mask']
-                )
-    for tok in examp_full:
-        print("Eval example:", tok)
-    print()
+    
+    # # Confirm attention mask works properly
+    # examp = eval_dataset[-1]
+    # examp_full = zip(tokenizer.convert_ids_to_tokens(examp['input_ids']),
+    #             examp['input_ids'],
+    #             examp['attention_mask'],
+    #             examp['cross_attention_mask']
+    #             )
+    # for tok in examp_full:
+    #     print("Eval example:", tok)
+    # print()
 
-    # Log a few random samples from the training set:
-#     for index in random.sample(range(len(train_dataset)), 3):
-#         logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
-
-    # DataLoaders creation:
+     # DataLoaders creation:
     label_pad_token_id = -100 if args.ignore_pad_token_for_loss else tokenizer.pad_token_id
     if args.pad_to_max_length:
         # If padding was already done ot max length, we use the default data collator that will just convert everything
@@ -736,6 +741,7 @@ def main():
                                 attention_mask=batch["attention_mask"],
                                 **gen_kwargs,
                                 no_repeat_ngram_size=3,
+                                repetition_penalty=0.9,
                                 early_stopping=True,
                                 return_dict_in_generate=True,
                                 output_scores=True

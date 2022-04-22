@@ -1,8 +1,8 @@
 --model_name_or_path	google/mt5-small
 
 --data_task			definition
---train_file		../data/codwoe/codwoe_temp_en_mask_train.json
---validation_file		../data/codwoe/codwoe_temp_en_mask.json
+--train_file		../data/codwoe/codwoe_train_en_99_morespace.json
+--validation_file		../data/codwoe/codwoe_val_en_99_morespace.json
 
 --source_lang		en
 --target_lang		en
