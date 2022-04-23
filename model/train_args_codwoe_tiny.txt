@@ -2,14 +2,14 @@
 
 --data_task			definition
 --train_file		../data/codwoe/codwoe_val_en_99_morespace.json
---validation_file		../data/codwoe/codwoe_val_en_99_morespace.json
+--validation_file		../data/codwoe/codwoe_val_en_99_morespace_tiny.json
 
 --source_lang		en
 --target_lang		en
 --max_source_length	64
 --max_target_length	64
 --source_prefix		""
---mask_context		True
+--mask_context		False
 --input_column		marked
 --demarcator		"<extra_id_99>"
 --mask_context		True
@@ -20,6 +20,7 @@
 --weight_decay		0.01
 --num_train_epochs	1
 --gradient_accumulation_steps	2
+--resid_wt			0.5
 
 --num_warmup_steps	0
 --output_dir		wandb_run

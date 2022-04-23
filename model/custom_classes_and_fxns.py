@@ -9,10 +9,11 @@ import warnings
 from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 
 import torch
-from torch.nn import CrossEntropyLoss
+from torch.nn import CrossEntropyLoss, Dropout, Module, ModuleList
+from transformers import MT5ForConditionalGeneration, T5Tokenizer
 from transformers.file_utils import PaddingStrategy
 from transformers.tokenization_utils_base import BatchEncoding
-from transformers import MT5ForConditionalGeneration, T5Tokenizer
+from transformers.models.t5 import modeling_t5
 
 from transformers.modeling_outputs import (
     BaseModelOutput,
@@ -43,6 +44,57 @@ num_heads)`.
 
 _CONFIG_FOR_DOC = "T5Config"
 
+def revise_residuals(residual_weight: float = 0.5):
+    """
+    Revise T5 internal layers to do weighted sum of attention scores and residual connections.
+    """
+    class T5LayerSelfAttentionRevisedResidual(modeling_t5.T5LayerSelfAttention):
+        """
+        This will adapt the former self-attention module to enable weighting of the residual connection sum.
+        """
+
+        def forward(
+            self,
+            hidden_states,
+            attention_mask=None,
+            position_bias=None,
+            layer_head_mask=None,
+            past_key_value=None,
+            use_cache=False,
+            output_attentions=False,
+        ):
+            normed_hidden_states = self.layer_norm(hidden_states)
+            attention_output = self.SelfAttention(
+                normed_hidden_states,
+                mask=attention_mask,
+                position_bias=position_bias,
+                layer_head_mask=layer_head_mask,
+                past_key_value=past_key_value,
+                use_cache=use_cache,
+                output_attentions=output_attentions,
+            )
+            hidden_states = residual_weight*hidden_states + (1-residual_weight)*self.dropout(attention_output[0])
+            outputs = (hidden_states,) + attention_output[1:]  # add attentions if we output them
+            print("Using revised class!!")
+            print("You just used a residual weight of ", residual_weight, "!")
+            return outputs
+
+    modeling_t5.T5LayerSelfAttention = T5LayerSelfAttentionRevisedResidual 
+    
+    class T5BlockRevisedResidual(modeling_t5.T5Block, Module):
+        def __init__(self, config, has_relative_attention_bias=False):
+            Module.__init__(self)
+            self.is_decoder = config.is_decoder
+            self.layer = ModuleList()
+            if self.is_decoder:
+                self.layer.append(modeling_t5.T5LayerSelfAttention(config, has_relative_attention_bias=has_relative_attention_bias))
+                self.layer.append(modeling_t5.T5LayerCrossAttention(config))
+            else:
+                self.layer.append(T5LayerSelfAttentionRevisedResidual(config, has_relative_attention_bias=has_relative_attention_bias))
+
+            self.layer.append(modeling_t5.T5LayerFF(config))
+            
+    modeling_t5.T5Block = T5BlockRevisedResidual
 
 
 def remove_def_markers(example, def_span_indices):

@@ -18,6 +18,7 @@ import datasets
 import numpy as np
 import torch
 from datasets import load_dataset, load_metric
+from torch import nn
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
@@ -40,12 +41,15 @@ from transformers import (
     set_seed,
 )
 from transformers.file_utils import get_full_repo_name
+from transformers.models.t5 import modeling_t5
 from transformers.utils.versions import require_version
 
 from custom_classes_and_fxns import (
     TokenizerWithXMask,
     MT5WithXMask,
-    prepare_for_xattn
+    prepare_for_xattn,
+    revise_residuals
+    # T5LayerSelfAttention
     )
 
 
@@ -366,6 +370,12 @@ def parse_args():
         default="input",
         help="The data column header (minus language) to be used as model input."
     )
+    parser.add_argument(
+        "--resid_wt",
+        type=float,
+        default=0.5,
+        help="Weight of residual connection in self-attention (0 is no residual, 0.5 is normal, 1 is no attention)."
+    )
     
     args = parser.parse_args()
 
@@ -389,6 +399,7 @@ def parse_args():
         assert args.data_task in ["translation", "definition"], "`data_task` should be translation or definition."
         
     return args
+
 
 
 def main():
@@ -460,8 +471,13 @@ def main():
     # See more about loading any type of standard or custom dataset (from files, python dict, pandas DataFrame, etc) at
     # https://huggingface.co/docs/datasets/loading_datasets.html.
 
+
     # Load pretrained model and tokenizer
-    #
+        
+    # Revise T5 source code prior to instantiating any of its classes
+    if args.resid_wt:
+        revise_residuals(args.resid_wt)
+    
     # In distributed training, the .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
     if args.config_name:
@@ -679,7 +695,12 @@ def main():
     
 
     # Train!
-
+    
+    wb_config = config.to_dict()
+    print("wb_config:\n", wb_config)
+    wb_config.update(vars(args))
+    print("wb_config UPDATED:\n", wb_config)
+    
     if args.report_to == "wandb":
         
         tags = args.tags.split(",") if args.tags else None
