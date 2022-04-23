@@ -60,13 +60,13 @@ def remove_def_markers(example, def_span_indices):
     return example
 
 
-def prepare_for_xattn(example, tokenizer):
+def prepare_for_xattn(example, tokenizer, demarcator):
     """
     Add cross-attention mask and remove temporary definiendum span markers
     from the data.
     """
     # Only definiendum span and eos_token will be unmasked for cross-attention
-    def_ids = tokenizer.convert_tokens_to_ids(["<extra_id_99>", tokenizer.eos_token])
+    def_ids = tokenizer.convert_tokens_to_ids([demarcator, tokenizer.eos_token])
     def_indices = []
     sent = example['input_ids']
     
@@ -74,7 +74,7 @@ def prepare_for_xattn(example, tokenizer):
         if token_id in def_ids:
             def_indices.append(i)
             
-    assert len(def_indices) == 3, "Definiendum span not found. def_indices should consist of 3 integers but is instead " + str(def_indices) + " (" + str(len(sent)) + ")\n" + tokenizer.decode(sent)
+    assert len(def_indices) == 3, "Definiendum span not found. def_indices should consist of 3 integers but is instead " + str(def_indices) + " (Length: " + str(len(sent)) + ")\n" + tokenizer.decode(sent)
     begin,end = def_indices[:2]
     eos_index = def_indices[-1]
     

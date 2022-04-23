@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding=utf-8
 """
-Fine-tuning a 🤗 Transformers model on text translation.
+Fine-tuning a 🤗 Transformers model on definition generation.
 """
 import pdb
 import argparse
@@ -84,7 +84,8 @@ def parse_args():
         default=None,
         help="The name of the dataset to use (via the datasets library).",
     )
-
+    
+    # Not currently implemented, but should be
     parser.add_argument(
         "--predict_with_generate",
         type=bool,
@@ -353,6 +354,18 @@ def parse_args():
         default=True,
         help="Whether or not to use a cross-attention mask during decoding."
     )
+    parser.add_argument(
+        "--demarcator",
+        type=str,
+        default="*",
+        help="The string/symbol used to demarcate the definiendum in the example sentence."
+    )
+    parser.add_argument(
+        "--input_column",
+        type=str,
+        default="marked",
+        help="The data column header (minus language) to be used as model input."
+    )
     
     args = parser.parse_args()
 
@@ -533,7 +546,7 @@ def main():
         target_label = target_lang
         
         if args.data_task == "definition":
-            input_label += "_marked"
+            input_label += "_" + args.input_column
             target_label += "_gloss"
             
         inputs = [ex[input_label] for ex in examples[args.data_task]]
@@ -573,9 +586,10 @@ def main():
                                                        )
             
         # Add cross-attention mask, remove definiendum span markers
-        # processed_datasets = processed_datasets.map(lambda x:
-        #                                         prepare_for_xattn(x, tokenizer),
-        #                                         desc="Adding cross-attention mask")
+        if args.mask_context:
+            processed_datasets = processed_datasets.map(lambda x:
+                                                    prepare_for_xattn(x, tokenizer, args.demarcator),
+                                                    desc="Adding cross-attention mask")
         
     train_dataset = processed_datasets["train"]
     eval_dataset = processed_datasets["validation"]
