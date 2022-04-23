@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding=utf-8
 """
-Fine-tuning a 🤗 Transformers model on text translation.
+Fine-tuning a 🤗 Transformers model on definition generation.
 """
 import pdb
 import argparse
@@ -84,7 +84,8 @@ def parse_args():
         default=None,
         help="The name of the dataset to use (via the datasets library).",
     )
-
+    
+    # Not currently implemented, but should be
     parser.add_argument(
         "--predict_with_generate",
         type=bool,
@@ -347,6 +348,25 @@ def parse_args():
         default="definition",
         help="Specify what kind of data is being used. Should be translation or definition."
     )
+    parser.add_argument(
+        "--mask_context",
+        type=bool,
+        default=True,
+        help="Whether or not to use a cross-attention mask during decoding."
+    )
+    parser.add_argument(
+        "--demarcator",
+        type=str,
+        default="*",
+        help="The string/symbol used to demarcate the definiendum in the example sentence."
+    )
+    parser.add_argument(
+        "--input_column",
+        type=str,
+        default="input",
+        help="The data column header (minus language) to be used as model input."
+    )
+    
     args = parser.parse_args()
 
     # Sanity checks
@@ -478,8 +498,10 @@ def main():
     # but we're not using them that way here. These are being used as TEMPORARY
     # markers to demarcate the where the definiendum is.
     # Make sure to mark definienda with these tokens prior to running the model.
-    special_tokens_dict = {"mask_token": "<MASK>", "sep_token": " <MASK>"}
-    tokenizer.add_special_tokens(special_tokens_dict)
+ 
+    # special_tokens_dict = {"mask_token": "<MASK>", "sep_token": " <MASK>"}
+    # tokenizer.add_special_tokens(special_tokens_dict)
+    
     # model.resize_token_embeddings(len(tokenizer))
     print("Vocab size:", len(tokenizer))
 
@@ -524,7 +546,7 @@ def main():
         target_label = target_lang
         
         if args.data_task == "definition":
-            input_label += "_marked"
+            input_label = args.input_column if args.input_column == "input" else input_label + '_' + args.input_column
             target_label += "_gloss"
             
         inputs = [ex[input_label] for ex in examples[args.data_task]]
@@ -564,13 +586,16 @@ def main():
                                                        )
             
         # Add cross-attention mask, remove definiendum span markers
-        xattn_datasets = processed_datasets.map(lambda x:
-                                                prepare_for_xattn(x, tokenizer),
-                                                desc="Adding cross-attention mask")
+        if args.mask_context:
+            processed_datasets = processed_datasets.map(lambda x:
+                                                    prepare_for_xattn(x, tokenizer, args.demarcator),
+                                                    desc="Adding cross-attention mask")
         
-    train_dataset = xattn_datasets["train"]
-    eval_dataset = xattn_datasets["validation"]
+    train_dataset = processed_datasets["train"]
+    eval_dataset = processed_datasets["validation"]
     print("Num eval examples: ", eval_dataset)
+    
+    # Confirm attention mask works properly
     examp = eval_dataset[-1]
     examp_full = zip(tokenizer.convert_ids_to_tokens(examp['input_ids']),
                 examp['input_ids'],
@@ -581,11 +606,7 @@ def main():
         print("Eval example:", tok)
     print()
 
-    # Log a few random samples from the training set:
-#     for index in random.sample(range(len(train_dataset)), 3):
-#         logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
-
-    # DataLoaders creation:
+     # DataLoaders creation:
     label_pad_token_id = -100 if args.ignore_pad_token_for_loss else tokenizer.pad_token_id
     if args.pad_to_max_length:
         # If padding was already done ot max length, we use the default data collator that will just convert everything
@@ -733,6 +754,9 @@ def main():
                                 batch["input_ids"],
                                 attention_mask=batch["attention_mask"],
                                 **gen_kwargs,
+                                no_repeat_ngram_size=3,
+                                repetition_penalty=1,
+                                early_stopping=True,
                                 return_dict_in_generate=True,
                                 output_scores=True
                             )
