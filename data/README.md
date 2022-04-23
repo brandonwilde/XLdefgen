@@ -40,10 +40,13 @@ python mark_data.py \
 	--output_file codwoe_test_de_marked.json
 ```
 
-Specify which language should be processed and how lenient the word-
-matcher should be (kwarg: allow). The allowance is based on Minimum
-Edit Distance, and will accept 0, 1, and 2 as inputs, with 0 restricting
-the matcher to exact matches, and 2 permitting an MED of up to 2.
+Specify which language should be processed and how lenient the wordmatcher
+should be (kwarg: allow). The allowance is based on Minimum Edit Distance,
+and will accept 0, 1, and 2 as inputs, with 0 restricting the matcher to
+exact matches, and 2 permitting an MED of up to 2.
+
+This will also automatically create a column called 'input' holding the
+processed data.
 
 Below are all arguments that may be passed when executing this script.
 
