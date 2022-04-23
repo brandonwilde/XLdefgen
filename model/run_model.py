@@ -363,7 +363,7 @@ def parse_args():
     parser.add_argument(
         "--input_column",
         type=str,
-        default="marked",
+        default="input",
         help="The data column header (minus language) to be used as model input."
     )
     
