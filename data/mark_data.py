@@ -242,13 +242,18 @@ def main():
         concat_col = args.lang + "_marked"
     
     if args.prepend:
-        data[args.lang+'_prepend'] = data.apply(lambda x: x[args.lang+'_word'] + '. ' + x[concat_col], axis=1)
+        data[args.lang+'_prepend'] = data.apply(lambda x: x[args.lang+'_word'] + '. ' + str(x[concat_col]), axis=1)
+        data['input'] = data[args.lang+'_prepend']
+    
+    elif args.mark:
+        data['input'] = data[args.lang+'_marked']
+
             
-    data_clean = data.dropna()
+    data_clean = data.dropna()  # Remove data based on nan's in marked column
     end_length = len(data_clean)
     
     print(data_clean)
-    print(start_length-end_length, "samples removed due the target word not being found in the example sentence.")
+    print(start_length-end_length, "samples removed due to the target word not being found in the example sentence.")
     
     # Show fuzzy match examples
     # Should change non-matches (in above code) to False rather

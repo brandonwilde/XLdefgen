@@ -44,3 +44,12 @@ Specify which language should be processed and how lenient the word-
 matcher should be (kwarg: allow). The allowance is based on Minimum
 Edit Distance, and will accept 0, 1, and 2 as inputs, with 0 restricting
 the matcher to exact matches, and 2 permitting an MED of up to 2.
+
+Below are all arguments that may be passed when executing this script.
+
+--input_file (str)	# csv data file
+--lang (str)		# which language to process
+--mark (flag)		# if passed, definiendum will be marked in example sents
+--prepend (flag)		# if passed, definiendum will be prepended to example sentence
+--allow (int)		# maximum allowable MED when matching definiendum in example sent
+--output_file (str)	# json data file
