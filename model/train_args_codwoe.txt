@@ -11,7 +11,7 @@
 --source_prefix		""
 --input_column		marked
 --demarcator		"<extra_id_90>"
---mask_context		True
+--mask_context		False
 --per_device_train_batch_size	2
 --per_device_eval_batch_size 	8
 --log_frequency		1000
@@ -19,6 +19,7 @@
 --weight_decay		0.01
 --num_train_epochs	3
 --gradient_accumulation_steps	2
+--num_beams		3
 
 --num_warmup_steps	0
 --output_dir		wandb_run

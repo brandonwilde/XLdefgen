@@ -776,7 +776,7 @@ def main():
                                 attention_mask=batch["attention_mask"],
                                 **gen_kwargs,
                                 no_repeat_ngram_size=3,
-                                repetition_penalty=0.9,
+                                repetition_penalty=1,
                                 early_stopping=True,
                                 return_dict_in_generate=True,
                                 output_scores=True
