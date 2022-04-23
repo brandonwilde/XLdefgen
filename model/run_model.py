@@ -546,7 +546,7 @@ def main():
         target_label = target_lang
         
         if args.data_task == "definition":
-            input_label += "_" + args.input_column
+            input_label = args.input_column if args.input_column == "input" else input_label + '_' + args.input_column
             target_label += "_gloss"
             
         inputs = [ex[input_label] for ex in examples[args.data_task]]
@@ -595,16 +595,16 @@ def main():
     eval_dataset = processed_datasets["validation"]
     print("Num eval examples: ", eval_dataset)
     
-    # # Confirm attention mask works properly
-    # examp = eval_dataset[-1]
-    # examp_full = zip(tokenizer.convert_ids_to_tokens(examp['input_ids']),
-    #             examp['input_ids'],
-    #             examp['attention_mask'],
-    #             examp['cross_attention_mask']
-    #             )
-    # for tok in examp_full:
-    #     print("Eval example:", tok)
-    # print()
+    # Confirm attention mask works properly
+    examp = eval_dataset[-1]
+    examp_full = zip(tokenizer.convert_ids_to_tokens(examp['input_ids']),
+                examp['input_ids'],
+                examp['attention_mask'],
+                examp['cross_attention_mask']
+                )
+    for tok in examp_full:
+        print("Eval example:", tok)
+    print()
 
      # DataLoaders creation:
     label_pad_token_id = -100 if args.ignore_pad_token_for_loss else tokenizer.pad_token_id

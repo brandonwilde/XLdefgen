@@ -74,9 +74,17 @@ def prepare_for_xattn(example, tokenizer, demarcator):
         if token_id in def_ids:
             def_indices.append(i)
             
-    assert len(def_indices) == 3, "Definiendum span not found. def_indices should consist of 3 integers but is instead " + str(def_indices) + " (Length: " + str(len(sent)) + ")\n" + tokenizer.decode(sent)
-    begin,end = def_indices[:2]
-    eos_index = def_indices[-1]
+    # assert len(def_indices) == 3, "Definiendum span not found. def_indices should consist of 3 integers but is instead " + str(def_indices) + " (Length: " + str(len(sent)) + ")\n" + tokenizer.decode(sent)
+    if len(def_indices) == 3: # Definiendum span found (plus eos token).
+        begin,end = def_indices[:2]
+        eos_index = def_indices[-1]
+        
+    elif len(def_indices) == 1: # Definiendum span not found (just eos token).
+        begin,end = [0,len(sent)-1]
+        eos_index = def_indices[0]
+    
+    else:
+        raise Exception("Did not find two definiendum markers.\n" + tokenizer.decode(sent))
     
     # Mask everything except for definiendum
     cross_attention_mask = [0]*len(sent)
@@ -85,7 +93,8 @@ def prepare_for_xattn(example, tokenizer, demarcator):
     example['cross_attention_mask'] = cross_attention_mask
     
     # Remove definiendum markers
-    example = remove_def_markers(example, (begin,end))
+    if len(def_indices) == 3: # Definiendum markers found
+        example = remove_def_markers(example, (begin,end))
     
     return example
 

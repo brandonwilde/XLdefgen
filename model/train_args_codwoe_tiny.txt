@@ -9,6 +9,7 @@
 --max_source_length	64
 --max_target_length	64
 --source_prefix		""
+--mask_context		True
 --input_column		marked
 --demarcator		"<extra_id_99>"
 --mask_context		True
