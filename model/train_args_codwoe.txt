@@ -1,8 +1,8 @@
 --model_name_or_path	google/mt5-small
 
---data_task			definition
+--data_task		definition
 --train_file		../data/codwoe/codwoe_train_en_99_morespace.json
---validation_file		../data/codwoe/codwoe_val_en_99_morespace.json
+--validation_file	../data/codwoe/codwoe_val_en_99_morespace.json
 
 --source_lang		en
 --target_lang		en
@@ -10,8 +10,9 @@
 --max_target_length	64
 --source_prefix		""
 --input_column		marked
---demarcator		"<extra_id_90>"
+--demarcator		"<extra_id_99>"
 --mask_context		False
+--truncate		True
 --per_device_train_batch_size	2
 --per_device_eval_batch_size 	8
 --log_frequency		1000
@@ -19,7 +20,11 @@
 --weight_decay		0.01
 --num_train_epochs	3
 --gradient_accumulation_steps	2
+--resid_wt		0.5
+
+--no_repeat_ngram_size	2
 --num_beams		3
+--early_stopping	True
 
 --num_warmup_steps	0
 --output_dir		wandb_run
