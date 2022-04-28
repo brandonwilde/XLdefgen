@@ -75,8 +75,7 @@ def revise_residuals(residual_weight: float = 0.5):
             )
             hidden_states = residual_weight*hidden_states + (1-residual_weight)*self.dropout(attention_output[0])
             outputs = (hidden_states,) + attention_output[1:]  # add attentions if we output them
-            print("Using revised class!!")
-            print("You just used a residual weight of ", residual_weight, "!")
+            
             return outputs
 
     modeling_t5.T5LayerSelfAttention = T5LayerSelfAttentionRevisedResidual 
@@ -112,7 +111,7 @@ def remove_def_markers(example, def_span_indices):
     return example
 
 
-def prepare_for_xattn(example, tokenizer, demarcator):
+def prepare_for_xattn(example, tokenizer, demarcator, mask_eos):
     """
     Add cross-attention mask and remove temporary definiendum span markers
     from the data.
@@ -138,10 +137,10 @@ def prepare_for_xattn(example, tokenizer, demarcator):
     else:
         raise Exception("Did not find two definiendum markers.\n" + tokenizer.decode(sent))
     
-    # Mask everything except for definiendum
+    # Mask everything except for definiendum (and optionally eos_token)
     cross_attention_mask = [0]*len(sent)
     cross_attention_mask[begin:end] = [1]*(end-begin)
-    cross_attention_mask[eos_index] = 1
+    cross_attention_mask[eos_index] = 0 if mask_eos else 1
     example['cross_attention_mask'] = cross_attention_mask
     
     # Remove definiendum markers
