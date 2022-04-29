@@ -24,21 +24,34 @@ def parse_args():
         "--input_file",
         type=str,
         default=None,
-        help="The file holding the data to be marked.",
+        help=("The csv file holding the raw data. Columns should be labeled with language code "
+              "and the type of data (e.g. en_gloss). Columns must include 'en_word', 'en_gloss', "
+              "and 'en_example' or the language's equivalent of these.")
     )
     
     parser.add_argument(
-        "--lang",
+        "--source_lang",
         type=str,
         default="en",
-        help="The language to create marked sentences in.",
+        help=("The language of the input data. Should match the language code in the input "
+              "file's column headers."),
+    )
+    
+    parser.add_argument(
+        "--target_lang",
+        type=str,
+        default="en",
+        help=("The language of the target data. Should match the language code in the input "
+              "file's 'gloss' header."),
     )
     
     parser.add_argument(
         "--allow",
         type=int,
         default=0,
-        help="The allowable minimum edit distance when matching the word to its occurence within the sentence.",
+        choices=[0,1,2],
+        help=("The allowable minimum edit distance when matching the word to its occurence within "
+        "the sentence. May be 0, 1, or 2.")
     )
     
     parser.add_argument(
@@ -66,11 +79,15 @@ def parse_args():
         action="store_true",
         help="If passed, will prepend definiendum to example/marked sentence.",
     )
+    parser.add_argument(
+        "--drop_columns",
+        action="store_true",
+        help="If passed, will drop all unnecessary columns after preparing data.",
+    )
 
     args = parser.parse_args()
     
-    assert args.allow in [0,1,2], "Allowable MED must be 0, 1, or 2."
-    assert args.lang in ["en", "de"], "language must be 'en' or 'de'."
+    # assert args.lang in ["en", "de"], "language must be 'en' or 'de'."
 
     return args
 
@@ -219,7 +236,7 @@ def main():
     # Parse the arguments
     args = parse_args()
     
-    if args.input_file is None: # If not running from command line
+    if args.input_file is None: # Or if not running from command line
         in_file = "C:/Users/brand/Documents/Projects/XLdefgen/data/codwoe_train_en.csv"
     else:
         in_file = args.input_file
@@ -230,33 +247,38 @@ def main():
     print(data)
     
     # Set default column for concatenation
-    concat_col = args.lang + "_example"
+    concat_col = args.source_lang + "_example"
     
     if args.mark:     
         if args.allow == 0:
-            data[args.lang+'_marked'] = data.apply(matcher_0, lang=args.lang, demarcator=args.demarcator, axis=1)
+            data[args.source_lang+'_marked'] = data.apply(matcher_0, lang=args.source_lang, demarcator=args.demarcator, axis=1)
         elif args.allow == 1:
-            data[args.lang+'_marked'] = data.apply(matcher_1, lang=args.lang, demarcator=args.demarcator, axis=1)
+            data[args.source_lang+'_marked'] = data.apply(matcher_1, lang=args.source_lang, demarcator=args.demarcator, axis=1)
         elif args.allow == 2:
-            data[args.lang+'_marked'] = data.apply(matcher_2, lang=args.lang, demarcator=args.demarcator, axis=1)
-        concat_col = args.lang + "_marked"
+            data[args.source_lang+'_marked'] = data.apply(matcher_2, lang=args.source_lang, demarcator=args.demarcator, axis=1)
+        
+        data['input'] = data[args.source_lang+'_marked']
+        concat_col = args.source_lang + "_marked"
     
     if args.prepend:
-        data[args.lang+'_prepend'] = data.apply(lambda x: x[args.lang+'_word'] + '. ' + str(x[concat_col]), axis=1)
-        data['input'] = data[args.lang+'_prepend']
+        data[args.source_lang+'_prepend'] = data.apply(lambda x: str(x[args.source_lang+'_word']) + '. ' + str(x[concat_col]), axis=1)
+        data['input'] = data[args.source_lang+'_prepend']
     
-    elif args.mark:
-        data['input'] = data[args.lang+'_marked']
-
-            
+    data['target'] = data[args.target_lang+'_gloss']
+    
     data_clean = data.dropna()  # Remove data based on nan's in marked column
     end_length = len(data_clean)
     
     print(data_clean)
     print(start_length-end_length, "samples removed due to the target word not being found in the example sentence.")
     
+    # Remove unnecessary columns
+    if args.drop_columns:
+        keep_columns = ["input", "target"]
+        data_clean = data_clean.drop(columns=[col for col in data_clean.columns.values if col not in keep_columns])
+    
     # Show fuzzy match examples
-    # Should change non-matches (in above code) to False rather
+    # Should change non-matches (in 'matcher' functions) to False rather
     # than np.nan in order to easily compare results.
     # diffs = np.where(data['keep'] != data['keep1'])
     # print(len(diffs[0]))
@@ -276,9 +298,9 @@ def main():
     
     import json
     # l = []
-    ds = data_clean.to_dict(orient = 'records')
+    data_entries = data_clean.to_dict(orient = 'records')
     with open(args.output_file, 'w') as f:
-        for line in ds:
+        for line in data_entries:
             d = {}
             d["definition"] = line
             f.write(json.dumps(d, sort_keys=False) + '\n') 
@@ -292,7 +314,7 @@ def main():
     # with open(args.output_file, 'w') as f:
     #     f.writelines(file_lines) 
     
-    print("Marked data saved in", args.output_file)
+    print("Formatted data saved in", args.output_file)
 
 if __name__ == "__main__":
 

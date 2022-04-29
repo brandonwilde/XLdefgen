@@ -35,8 +35,12 @@ Usage:
 ```bash
 python mark_data.py \
 	--input_file codwoe_test_de.csv \
-	--lang de \
+	--source_lang de \
+	--target_lang en \
+	--mark \
+	--demarcator "<extra_id_99>" \
 	--allow 1 \
+	--drop_columns \
 	--output_file codwoe_test_de_marked.json
 ```
 
@@ -51,8 +55,11 @@ processed data.
 Below are all arguments that may be passed when executing this script.
 
 --input_file (str)	# csv data file
---lang (str)		# which language to process
+--source_lang (str)	# language for inputs
+--target_lang (str)	# language for targets (glosses)
 --mark (flag)		# if passed, definiendum will be marked in example sents
---prepend (flag)		# if passed, definiendum will be prepended to example sentence
+--demarcator (str)	# symbol to use for marking definiendum
 --allow (int)		# maximum allowable MED when matching definiendum in example sent
+--prepend (flag)		# if passed, definiendum will be prepended to example sentence
+--drop_columns (flag)	# if passed, only input and target columns will be output
 --output_file (str)	# json data file
