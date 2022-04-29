@@ -175,13 +175,13 @@ def parse_args():
         "--source_lang",
         type=str,
         default=None,
-        help="Source language id for translation."
+        help="Source language id."
     )
     parser.add_argument(
         "--target_lang",
         type=str,
         default=None,
-        help="Target language id for translation."
+        help="Target language id."
     )
     parser.add_argument(
         "--source_prefix",
@@ -198,7 +198,7 @@ def parse_args():
     parser.add_argument(
         "--overwrite_cache",
         type=str2bool,
-        default=None,
+        default=True,
         help="Overwrite the cached training and evaluation sets"
     )
     parser.add_argument(
@@ -371,7 +371,7 @@ def parse_args():
     parser.add_argument(
         "--demarcator",
         type=str,
-        default="*",
+        default="",
         help="The string/symbol used to demarcate the definiendum in the example sentence."
     )
     parser.add_argument(
@@ -564,9 +564,8 @@ def main():
  
     # special_tokens_dict = {"mask_token": "<MASK>", "sep_token": " <MASK>"}
     # tokenizer.add_special_tokens(special_tokens_dict)
-    
     # model.resize_token_embeddings(len(tokenizer))
-    print("Vocab size:", len(tokenizer))
+    
     for item in sorted(model.config.to_dict().items()):
         print(item)
 
@@ -607,12 +606,24 @@ def main():
         
     # May need to edit this if train and validation datasets have different data_task
     def preprocess_function(examples):
-        input_label = source_lang # This suffices for translation data_task
-        target_label = target_lang
         
+        
+        # Set input and target keys
         if args.data_task == "definition":
-            input_label = args.input_column if args.input_column == "input" else input_label + '_' + args.input_column
-            target_label += "_gloss"
+            if args.input_column == "input":
+                input_label = args.input_column
+            else:
+                input_label = target_lang + '_' + args.input_column
+            target_label = "target"
+            # target_lang + "_gloss"
+        
+        elif args.data_task == "translation":
+            input_label = source_lang
+            target_label = target_lang
+        
+        else:
+            raise KeyError("Need to specify how to handle data if data_task"
+                           "is not 'definition' or 'translation'.")
             
         inputs = [ex[input_label] for ex in examples[args.data_task]]
         targets = [ex[target_label] for ex in examples[args.data_task]]
@@ -633,35 +644,35 @@ def main():
         model_inputs["labels"] = labels["input_ids"]
         return model_inputs
     
-    with accelerator.main_process_first():
-        print("Size of raw train dataset :", len(raw_datasets["train"]))
-              
+    with accelerator.main_process_first():             
         processed_datasets = raw_datasets.map(
         preprocess_function,
         batched=True,
         num_proc=args.preprocessing_num_workers,
         remove_columns=column_names,
-        # load_from_cache_file=not args.overwrite_cache,
-        load_from_cache_file=False,
+        load_from_cache_file=not args.overwrite_cache,
+        # load_from_cache_file=False,
         desc="Running tokenizer on dataset",
         )
         
         for ex in processed_datasets["train"]["input_ids"][:5]:
             print("Example input length:", len(ex))
-        print("Size of processed dataset:", len(processed_datasets["train"]))
         
         # This doesn't work well with mixed inputs
-        # Filter out inputs that are too long (rather than truncate)
         # Filter out inputs where the definiendum has been cut off in truncation.
-        # if args.demarcator is not None:
-        #     demarc_id = tokenizer.convert_tokens_to_ids(args.demarcator)
-        #     processed_datasets = processed_datasets.filter(lambda ex:
-        #                                                    ex['input_ids'].count(demarc_id) == 2
-        #                                                    # len(ex['input_ids']) < args.max_source_length and 
-        #                                                    # len(ex['labels']) < max_target_length
-        #                                                    )
-        print("Size of filtered dataset:", len(processed_datasets["train"]))
+        if args.demarcator is not None:
+            init_length = len(processed_datasets["train"])
             
+            # check for both demarcators
+            demarc_id = tokenizer.convert_tokens_to_ids(args.demarcator)
+            processed_datasets = processed_datasets.filter(lambda ex:
+                                                            ex['input_ids'].count(demarc_id) == 2
+                                                            )
+            end_length = len(processed_datasets["train"])
+            dropped = init_length - end_length
+            print(f"{dropped} examples filtered out due to definiendum getting lost in truncation.")
+            
+        
         # Add cross-attention mask, remove definiendum span markers
         if args.mask_context:
             processed_datasets = processed_datasets.map(lambda x:
