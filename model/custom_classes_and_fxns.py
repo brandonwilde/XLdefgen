@@ -73,12 +73,15 @@ def revise_residuals(residual_weight: float = 0.5):
                 use_cache=use_cache,
                 output_attentions=output_attentions,
             )
-            hidden_states = residual_weight*hidden_states + (1-residual_weight)*self.dropout(attention_output[0])
+            
+            # Edited portion
+            hidden_states = 2*(residual_weight*hidden_states + (1-residual_weight)*self.dropout(attention_output[0]))
+            
             outputs = (hidden_states,) + attention_output[1:]  # add attentions if we output them
             
             return outputs
 
-    modeling_t5.T5LayerSelfAttention = T5LayerSelfAttentionRevisedResidual 
+    # modeling_t5.T5LayerSelfAttention = T5LayerSelfAttentionRevisedResidual 
     
     class T5BlockRevisedResidual(modeling_t5.T5Block, Module):
         def __init__(self, config, has_relative_attention_bias=False):
@@ -88,7 +91,9 @@ def revise_residuals(residual_weight: float = 0.5):
             if self.is_decoder:
                 self.layer.append(modeling_t5.T5LayerSelfAttention(config, has_relative_attention_bias=has_relative_attention_bias))
                 self.layer.append(modeling_t5.T5LayerCrossAttention(config))
-            else:
+            
+            # Edited portion
+            else: # if is encoder
                 self.layer.append(T5LayerSelfAttentionRevisedResidual(config, has_relative_attention_bias=has_relative_attention_bias))
 
             self.layer.append(modeling_t5.T5LayerFF(config))
@@ -116,36 +121,42 @@ def prepare_for_xattn(example, tokenizer, demarcator, mask_eos):
     Add cross-attention mask and remove temporary definiendum span markers
     from the data.
     """
-    # Only definiendum span and eos_token will be unmasked for cross-attention
-    def_ids = tokenizer.convert_tokens_to_ids([demarcator, tokenizer.eos_token])
-    def_indices = []
     sent = example['input_ids']
     
+    # Find definiendum span
+    demarc_id = tokenizer.convert_tokens_to_ids(demarcator)
+    demarc_indices = []
+    
     for i, token_id in enumerate(sent):
-        if token_id in def_ids:
-            def_indices.append(i)
+        if token_id == demarc_id:
+            demarc_indices.append(i)
             
-    # assert len(def_indices) == 3, "Definiendum span not found. def_indices should consist of 3 integers but is instead " + str(def_indices) + " (Length: " + str(len(sent)) + ")\n" + tokenizer.decode(sent)
-    if len(def_indices) == 3: # Definiendum span found (plus eos token).
-        begin,end = def_indices[:2]
-        eos_index = def_indices[-1]
-        
-    elif len(def_indices) == 1: # Definiendum span not found (just eos token).
-        begin,end = [0,len(sent)-1]
-        eos_index = def_indices[0]
+    # assert len(demarc_indices) == 3, "Definiendum span not found. demarc_indices should consist of 3 integers but is instead " + str(demarc_indices) + " (Length: " + str(len(sent)) + ")\n" + tokenizer.decode(sent)
+    if len(demarc_indices) == 2: # Definiendum span found.
+        begin,end = demarc_indices
     
     else:
         raise Exception("Did not find two definiendum markers.\n" + tokenizer.decode(sent))
     
-    # Mask everything except for definiendum (and optionally eos_token)
+    # Mask everything except for definiendum
     cross_attention_mask = [0]*len(sent)
     cross_attention_mask[begin:end] = [1]*(end-begin)
-    cross_attention_mask[eos_index] = 0 if mask_eos else 1
+    
+    # Optionally unmask eos_token
+    if not mask_eos:
+        eos_id = tokenizer.convert_tokens_to_ids(tokenizer.eos_token)
+        for i, token_id in enumerate(sent):
+            if token_id == eos_id:
+                eos_index = i  # store final occurence of eos_token
+
+        cross_attention_mask[eos_index] = 1
+    
+    # Add mask to inputs
     example['cross_attention_mask'] = cross_attention_mask
     
     # Remove definiendum markers
-    if len(def_indices) == 3: # Definiendum markers found
-        example = remove_def_markers(example, (begin,end))
+    if len(demarc_indices) == 2: # Definiendum markers found
+        example = remove_def_markers(example, demarc_indices)
     
     return example
 
