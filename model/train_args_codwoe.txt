@@ -1,15 +1,14 @@
 --model_name_or_path	google/mt5-small
 
 --data_task		definition
---train_file		../data/codwoe/codwoe_train_en_99_morespace.json
---validation_file	../data/codwoe/codwoe_val_en_99_morespace.json
+--train_file		../data/codwoe/codwoe_train_en.json
+--validation_file	../data/codwoe/codwoe_val_de_mark.json
 
---source_lang		en
+--source_lang		de
 --target_lang		en
 --max_source_length	64
 --max_target_length	64
 --source_prefix		""
---input_column		marked
 --demarcator		"<extra_id_99>"
 --mask_context		False
 --truncate		True
@@ -28,6 +27,6 @@
 
 --num_warmup_steps	0
 --output_dir		wandb_run
---report_to			wandb
+--report_to		wandb
 --wandb_proj		def_train
 --seed			42
