@@ -152,7 +152,7 @@ def matcher_1(series, lang="en", demarcator="*"):
             except:
                 end = len(sent)
                 
-            return sent[:start]+demarcator+' '+sent[start:end]+' '+demarcator+sent[end:]
+            return sent[:start]+' '+demarcator+' '+sent[start:end]+' '+demarcator+' '+sent[end:]
         
         else: # No match
             return np.nan
@@ -174,7 +174,7 @@ def matcher_1(series, lang="en", demarcator="*"):
             except:
                 end = len(sent)
                 
-            return sent[:start]+demarcator+' '+sent[start:end]+' '+demarcator+sent[end:]
+            return sent[:start]+' '+demarcator+' '+sent[start:end]+' '+demarcator+' '+sent[end:]
         
         else: # No match
             return np.nan
@@ -204,7 +204,7 @@ def matcher_2(series, lang="en", demarcator="*"): # This seems to let in too man
             except:
                 end = len(sent)
                 
-            return sent[:start]+demarcator+' '+sent[start:end]+' '+demarcator+sent[end:]
+            return sent[:start]+' '+demarcator+' '+sent[start:end]+' '+demarcator+' '+sent[end:]
         
         else: # No match
             return np.nan
@@ -226,7 +226,7 @@ def matcher_2(series, lang="en", demarcator="*"): # This seems to let in too man
             except:
                 end = len(sent)
                 
-            return sent[:start]+demarcator+' '+sent[start:end]+' '+demarcator+sent[end:]
+            return sent[:start]+' '+demarcator+' '+sent[start:end]+' '+demarcator+' '+sent[end:]
         
         else: # No match
             return np.nan
