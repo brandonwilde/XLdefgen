@@ -34,6 +34,63 @@ EncodedInput = List[int]
 #     replace_return_docstrings,
 # )
 
+
+def get_lowercase_ids(token_ids, tokenizer):
+    """
+    Given the token ids for a word, this will return the token ids
+    corresponding to the lowercase version of the word.
+    """
+    word = tokenizer.decode(token_ids)
+    lower_word = word.lower()
+    
+    return tokenizer.encode(lower_word, add_special_tokens=False)
+
+
+def get_batched_definienda(dataloader, mask_context, demarcator_id, tokenizer):
+    """
+    Get definienda by batch.
+    """
+    if mask_context: # we'll get definienda from cross_attention_masks
+        definienda = []
+        for i, batch in enumerate(dataloader):
+            batch_definienda = []
+            for j, example in enumerate(batch.input_ids):
+                word_ids = [example[k] for k in range(len(example)) if batch.cross_attention_mask[j][k] == 1]
+                batch_definienda.append(word_ids)
+                
+                # add lower-cased version of same
+                lower_word_ids = get_lowercase_ids(word_ids, tokenizer)
+                if lower_word_ids != word_ids:
+                    batch_definienda.append(lower_word_ids)
+                    
+            definienda.append(batch_definienda)
+    
+    else: # no cross_attention_masks, but demarcators are present
+        definienda = []
+        for i, batch in enumerate(dataloader):
+            batch_definienda = []
+            for example in batch.input_ids:
+                span = []
+                for j, token_id in enumerate(example):
+                    if token_id == demarcator_id:
+                        span.append(j)
+          
+                if len(span) == 2:    # definiendum span found
+                    word_ids = example[span[0]+1:span[1]].tolist()
+                    batch_definienda.append(word_ids)   # add definiendum
+                    
+                    # add lower-cased version of same
+                    lower_word_ids = get_lowercase_ids(word_ids, tokenizer)
+                    if lower_word_ids != word_ids:
+                        batch_definienda.append(lower_word_ids)
+                    
+            definienda.append(batch_definienda) # add batch
+    
+    return definienda
+
+
+
+
 # Warning messafe for FutureWarning: head_mask was separated into two input args - head_mask, decoder_head_mask
 __HEAD_MASK_WARNING_MSG = """
 The input argument `head_mask` was split into two arguments `head_mask` and `decoder_head_mask`. Currently,

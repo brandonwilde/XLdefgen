@@ -48,7 +48,8 @@ from custom_classes_and_fxns import (
     TokenizerWithXMask,
     MT5WithXMask,
     prepare_for_xattn,
-    revise_residuals
+    revise_residuals,
+    get_batched_definienda
     # T5LayerSelfAttention
     )
 
@@ -422,6 +423,12 @@ def parse_args():
         default=True,
         help="Whether to truncate inputs and targets to specified max levels."
         )
+    parser.add_argument(
+        "--ban_definienda",
+        type=str2bool,
+        default=False,
+        help="Whether to disallow definienda from being generated in output."
+        )
     
     args = parser.parse_args()
 
@@ -718,20 +725,9 @@ def main():
     eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=args.per_device_eval_batch_size)
 
     # Get a list of the definienda for each batch (to ban them in output)
-    # Only do validation data for now, since this is only works in model.generate()
-    definienda = []
-    for i, batch in enumerate(eval_dataloader):
-        batch_definienda = []
-        for example in batch.input_ids:
-            span = []
-            for j, token_id in enumerate(example):
-                if token_id == demarc_id: 
-                    span.append(j)
-      
-            if len(span) == 2:    # definiendum span found
-                batch_definienda.append(example[span[0]+1:span[1]].tolist()) # add definiendum
-    
-        definienda.append(batch_definienda) # add batch
+    demarc_id = tokenizer.convert_tokens_to_ids(args.demarcator)
+    if args.ban_definienda:
+        definienda = get_batched_definienda(eval_dataloader, args.mask_context, demarc_id, tokenizer)
     
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.
