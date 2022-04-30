@@ -717,6 +717,22 @@ def main():
     )
     eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=args.per_device_eval_batch_size)
 
+    # Get a list of the definienda for each batch (to ban them in output)
+    # Only do validation data for now, since this is only works in model.generate()
+    definienda = []
+    for i, batch in enumerate(eval_dataloader):
+        batch_definienda = []
+        for example in batch.input_ids:
+            span = []
+            for j, token_id in enumerate(example):
+                if token_id == demarc_id: 
+                    span.append(j)
+      
+            if len(span) == 2:    # definiendum span found
+                batch_definienda.append(example[span[0]+1:span[1]].tolist()) # add definiendum
+    
+        definienda.append(batch_definienda) # add batch
+    
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.
     no_decay = ["bias", "LayerNorm.weight"]
@@ -846,6 +862,7 @@ def main():
                             outputs = accelerator.unwrap_model(model).generate(
                                 batch["input_ids"],
                                 attention_mask=batch["attention_mask"],
+                                bad_words_ids=definienda[eval_step],
                                 **gen_kwargs,
                                 return_dict_in_generate=True,
                                 output_scores=True
