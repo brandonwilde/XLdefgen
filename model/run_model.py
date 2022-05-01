@@ -396,7 +396,7 @@ def parse_args():
     parser.add_argument(
         "--mask_eos",
         type=str2bool,
-        default=False,
+        default=True,
         help="If mask_context=True, then this will also mask the eos_token during cross-attention."
         )
     parser.add_argument(

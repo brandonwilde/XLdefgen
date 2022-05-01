@@ -2,7 +2,7 @@
 
 --data_task		definition
 --train_file		../data/codwoe/codwoe_train_en.json
---validation_file	../data/codwoe/codwoe_val_de_mark.json
+--validation_file	../data/codwoe/codwoe_val_de.json
 
 --source_lang		de
 --target_lang		en
@@ -11,9 +11,10 @@
 --source_prefix		""
 --demarcator		"<extra_id_99>"
 --mask_context		False
+--mask_eos		True
 --truncate		True
 --per_device_train_batch_size	2
---per_device_eval_batch_size 	8
+--per_device_eval_batch_size 	7
 --log_frequency		1000
 --learning_rate		2e-4
 --weight_decay		0.01
@@ -21,6 +22,7 @@
 --gradient_accumulation_steps	2
 --resid_wt		0.5
 
+--ban_definienda	True
 --no_repeat_ngram_size	2
 --num_beams		3
 --early_stopping	True

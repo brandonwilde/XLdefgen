@@ -55,7 +55,7 @@ def get_batched_definienda(dataloader, mask_context, demarcator_id, tokenizer):
         for i, batch in enumerate(dataloader):
             batch_definienda = []
             for j, example in enumerate(batch.input_ids):
-                word_ids = [example[k] for k in range(len(example)) if batch.cross_attention_mask[j][k] == 1]
+                word_ids = [example[k].item() for k in range(len(example)) if batch.cross_attention_mask[j][k] == 1]
                 batch_definienda.append(word_ids)
                 
                 # add lower-cased version of same
