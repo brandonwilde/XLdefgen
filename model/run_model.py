@@ -382,6 +382,12 @@ def parse_args():
         help="The data column header (minus language) to be used as model input."
     )
     parser.add_argument(
+        "--target_column",
+        type=str,
+        default="target",
+        help="The data column header (minus language) to be used as model target."
+    )    
+    parser.add_argument(
         "--resid_wt",
         type=float,
         default=0.5,
@@ -429,7 +435,7 @@ def parse_args():
         default=False,
         help="Whether to disallow definienda from being generated in output."
         )
-    
+
     args = parser.parse_args()
 
     # Sanity checks
@@ -625,12 +631,16 @@ def main(args):
         
         # Set input and target keys
         if args.data_task == "definition":
+            
             if args.input_column == "input":
                 input_label = args.input_column
             else:
-                input_label = target_lang + '_' + args.input_column
-            target_label = "target"
-            # target_lang + "_gloss"
+                input_label = source_lang + '_' + args.input_column
+                
+            if args.target_column == "target":
+                target_label = args.target_column
+            else:
+                target_label = target_lang + '_' + args.target_column
         
         elif args.data_task == "translation":
             input_label = source_lang
@@ -911,6 +921,7 @@ def main(args):
                                    'eval/loss': val_loss,
                                    'eval/perplexity': val_ppl,
                                    'eval/bleu': eval_metric['score'],
+                                   'eval/length': eval_metric['sys_len']/len(eval_dataloader)
                                    })
                 if completed_steps >= args.max_train_steps:
                     break
