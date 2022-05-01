@@ -455,9 +455,7 @@ def parse_args():
 
 
 
-def main():
-    # Parse the arguments
-    args = parse_args()  
+def main(args):
     
     # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
     accelerator = Accelerator()
@@ -547,7 +545,10 @@ def main():
     if args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name, use_fast=not args.use_slow_tokenizer)
     elif args.model_name_or_path:
-        tokenizer = TokenizerWithXMask.from_pretrained(args.model_name_or_path, use_fast=not args.use_slow_tokenizer)
+        if not "tiny" in args.model_name_or_path:
+            tokenizer = TokenizerWithXMask.from_pretrained(args.model_name_or_path, use_fast=not args.use_slow_tokenizer)
+        else: # Using tiny model - not compatible with TokenizerWithXMask
+            tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=not args.use_slow_tokenizer)
     else:
         raise ValueError(
             "You are instantiating a new tokenizer from scratch. This is not supported by this script."
@@ -555,11 +556,18 @@ def main():
         )
         
     if args.model_name_or_path:
-        model = MT5WithXMask.from_pretrained(
-            args.model_name_or_path,
-            from_tf=bool(".ckpt" in args.model_name_or_path),
-            config=config,
-        )
+        if not "tiny" in args.model_name_or_path:
+            model = MT5WithXMask.from_pretrained(
+                args.model_name_or_path,
+                from_tf=bool(".ckpt" in args.model_name_or_path),
+                config=config,
+            )
+        else: # Using tiny model - not compatible with MT5WithXMask
+            model = AutoModelForSeq2SeqLM.from_pretrained(
+                args.model_name_or_path,
+                from_tf=bool(".ckpt" in args.model_name_or_path),
+                # config=config,
+            )
     else:
         logger.info("Training new model from scratch")
         model = MT5WithXMask.from_config(config)
@@ -858,7 +866,7 @@ def main():
                             outputs = accelerator.unwrap_model(model).generate(
                                 batch["input_ids"],
                                 attention_mask=batch["attention_mask"],
-                                bad_words_ids=definienda[eval_step],
+                                bad_words_ids=definienda[eval_step] if args.ban_definienda else None,
                                 **gen_kwargs,
                                 return_dict_in_generate=True,
                                 output_scores=True
@@ -922,5 +930,10 @@ def main():
                     repo.push_to_hub(commit_message="End of training", auto_lfs_prune=True)
 
 if __name__ == "__main__":
-
-    main()
+    
+    # sys.argv = ['run_model.py', '--file', 'train_args_codwoe_tiny.txt'] # Uncomment this to run in IDE
+    
+    # Parse the arguments
+    args = parse_args()  
+    
+    main(args)

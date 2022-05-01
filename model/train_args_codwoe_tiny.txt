@@ -10,9 +10,8 @@
 --max_target_length	64
 --source_prefix		""
 --mask_context		False
---input_column		marked
+--input_column		input
 --demarcator		"<extra_id_99>"
---mask_context		True
 --per_device_train_batch_size	1
 --per_device_eval_batch_size 	1
 --log_frequency		50
