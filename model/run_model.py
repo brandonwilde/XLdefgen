@@ -868,43 +868,44 @@ def main(args):
                         "early_stopping": model.config.early_stopping,
                     }
                     for eval_step, batch in enumerate(eval_dataloader):
-                        with torch.no_grad():
-                            
-                            outputs = model(**batch)
-                            loss += outputs.loss             # Gradient accumulating
-                            
-                            outputs = accelerator.unwrap_model(model).generate(
-                                batch["input_ids"],
-                                attention_mask=batch["attention_mask"],
-                                bad_words_ids=definienda[eval_step] if args.ban_definienda else None,
-                                **gen_kwargs,
-                                return_dict_in_generate=True,
-                                output_scores=True
-                            )
-                            
-                            generated_tokens = outputs.sequences
-                            
-                            generated_tokens = accelerator.pad_across_processes(
-                                generated_tokens, dim=1, pad_index=tokenizer.pad_token_id
-                            )
-                            labels = batch["labels"]
-                            if not args.pad_to_max_length:
-                                # If we did not pad to max length, we need to pad the labels too
-                                labels = accelerator.pad_across_processes(batch["labels"], dim=1, pad_index=tokenizer.pad_token_id)
-            
-                            generated_tokens = accelerator.gather(generated_tokens).cpu().numpy()
-                            labels = accelerator.gather(labels).cpu().numpy()
-                                    
-                            if args.ignore_pad_token_for_loss:
-                                # Replace -100 in the labels as we can't decode them.
-                                labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-            
-                            decoded_preds = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-                            decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-            
-                            decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
-    
-                            metric.add_batch(predictions=decoded_preds, references=decoded_labels)
+                        if not eval_step == len(eval_dataloader) - 1: # Skip last batch, since it is often partial.
+                            with torch.no_grad():               # Want to see full results.
+                                
+                                outputs = model(**batch)
+                                loss += outputs.loss             # Gradient accumulating
+                                
+                                outputs = accelerator.unwrap_model(model).generate(
+                                    batch["input_ids"],
+                                    attention_mask=batch["attention_mask"],
+                                    bad_words_ids=definienda[eval_step] if args.ban_definienda else None,
+                                    **gen_kwargs,
+                                    return_dict_in_generate=True,
+                                    output_scores=True
+                                )
+                                
+                                generated_tokens = outputs.sequences
+                                
+                                generated_tokens = accelerator.pad_across_processes(
+                                    generated_tokens, dim=1, pad_index=tokenizer.pad_token_id
+                                )
+                                labels = batch["labels"]
+                                if not args.pad_to_max_length:
+                                    # If we did not pad to max length, we need to pad the labels too
+                                    labels = accelerator.pad_across_processes(batch["labels"], dim=1, pad_index=tokenizer.pad_token_id)
+                
+                                generated_tokens = accelerator.gather(generated_tokens).cpu().numpy()
+                                labels = accelerator.gather(labels).cpu().numpy()
+                                        
+                                if args.ignore_pad_token_for_loss:
+                                    # Replace -100 in the labels as we can't decode them.
+                                    labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+                
+                                decoded_preds = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+                                decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+                
+                                decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
+        
+                                metric.add_batch(predictions=decoded_preds, references=decoded_labels)
                     print("Epochs completed:", epoch+(train_step+1)/len(train_dataloader))
                     for pred in zip(decoded_preds, decoded_labels):
                         print()
