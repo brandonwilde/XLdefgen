@@ -28,15 +28,15 @@ The outputs will be labeled 'input' and 'target'.
 
 Below are all arguments that may be passed when executing this script.
 
---input_file (str)	# csv data file
---source_lang (str)	# language for inputs
---target_lang (str)	# language for targets (glosses)
---mark (flag)		# if passed, definiendum will be marked in example sents
---demarcator (str)	# symbol to use for marking definiendum
---prepend (flag)		# if passed, definiendum will be prepended to example sentence
---allow (int)		# maximum allowable MED when matching definiendum in example sent
---drop_columns (flag)	# if passed, only input and target columns will be output
---output_file (str)	# json data file
+--input_file (str)	# csv data file  
+--source_lang (str)	# language for inputs  
+--target_lang (str)	# language for targets (glosses)  
+--mark (flag)		# if passed, definiendum will be marked in example sents  
+--demarcator (str)	# symbol to use for marking definiendum  
+--prepend (flag)		# if passed, definiendum will be prepended to example sentence  
+--allow (int)		# maximum allowable MED when matching definiendum in example sent  
+--drop_columns (flag)	# if passed, only input and target columns will be output  
+--output_file (str)	# json data file  
 
 
 ## Split data
