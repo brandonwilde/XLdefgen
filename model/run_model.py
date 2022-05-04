@@ -18,6 +18,7 @@ import datasets
 import numpy as np
 import torch
 from datasets import load_dataset, load_metric
+from torch import nn
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
@@ -40,12 +41,16 @@ from transformers import (
     set_seed,
 )
 from transformers.file_utils import get_full_repo_name
+from transformers.models.t5 import modeling_t5
 from transformers.utils.versions import require_version
 
 from custom_classes_and_fxns import (
     TokenizerWithXMask,
     MT5WithXMask,
-    prepare_for_xattn
+    prepare_for_xattn,
+    revise_residuals,
+    get_batched_definienda
+    # T5LayerSelfAttention
     )
 
 
@@ -64,6 +69,16 @@ class LoadFromFile(argparse.Action):
             line = f.read()
             parser.parse_args(shlex.split(line), namespace)
 
+def str2bool(v):
+    '''Accept string boolean values in arguments.'''
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ['true','t','yes','y','1']:
+        return True
+    if v.lower() in ['false','f','no','n','0']:
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Boolean value expected.")
 
 # Parsing input arguments
 def parse_args():
@@ -88,7 +103,7 @@ def parse_args():
     # Not currently implemented, but should be
     parser.add_argument(
         "--predict_with_generate",
-        type=bool,
+        type=str2bool,
         default=True,
         help="",
     )
@@ -139,7 +154,7 @@ def parse_args():
     )
     parser.add_argument(
         "--pad_to_max_length",
-        type=bool,
+        type=str2bool,
         default=False,
         help="Whether to pad all samples to model maximum sentence "
         "length. If False, will pad the samples dynamically when batching to the maximum length in the batch. More"
@@ -153,7 +168,7 @@ def parse_args():
     )
     parser.add_argument(
         "--ignore_pad_token_for_loss",
-        type=bool,
+        type=str2bool,
         default=True,
         help="Whether to ignore the tokens corresponding to " "padded labels in the loss computation or not.",
     )
@@ -161,13 +176,13 @@ def parse_args():
         "--source_lang",
         type=str,
         default=None,
-        help="Source language id for translation."
+        help="Source language id."
     )
     parser.add_argument(
         "--target_lang",
         type=str,
         default=None,
-        help="Target language id for translation."
+        help="Target language id."
     )
     parser.add_argument(
         "--source_prefix",
@@ -183,8 +198,8 @@ def parse_args():
     )
     parser.add_argument(
         "--overwrite_cache",
-        type=bool,
-        default=None,
+        type=str2bool,
+        default=True,
         help="Overwrite the cached training and evaluation sets"
     )
     parser.add_argument(
@@ -270,7 +285,7 @@ def parse_args():
     )
     parser.add_argument(
         "--lr_scheduler_type",
-        type=SchedulerType,
+        type=str,
         default="linear",
         help="The scheduler type to use.",
         choices=["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"],
@@ -350,14 +365,14 @@ def parse_args():
     )
     parser.add_argument(
         "--mask_context",
-        type=bool,
-        default=True,
+        type=str2bool,
+        default=False,
         help="Whether or not to use a cross-attention mask during decoding."
     )
     parser.add_argument(
         "--demarcator",
         type=str,
-        default="*",
+        default="",
         help="The string/symbol used to demarcate the definiendum in the example sentence."
     )
     parser.add_argument(
@@ -366,7 +381,61 @@ def parse_args():
         default="input",
         help="The data column header (minus language) to be used as model input."
     )
-    
+    parser.add_argument(
+        "--target_column",
+        type=str,
+        default="target",
+        help="The data column header (minus language) to be used as model target."
+    )    
+    parser.add_argument(
+        "--resid_wt",
+        type=float,
+        default=0.5,
+        help="Weight of residual connection in self-attention (0 is no residual, 0.5 is normal, 1 is no attention)."
+    )
+    parser.add_argument(
+        "--min_length",
+        type=int,
+        default=0,
+        help="Minimum length of generated output."
+    )
+    parser.add_argument(
+        "--mask_eos",
+        type=str2bool,
+        default=True,
+        help="If mask_context=True, then this will also mask the eos_token during cross-attention."
+        )
+    parser.add_argument(
+        "--filter_definiendum", # Not implemented yet
+        type=str2bool,
+        default=False,
+        help="Whether to disallow the definiendum from appearing in the definition."
+        )
+    parser.add_argument(
+        "--no_repeat_ngram_size",
+        type=int,
+        default=0,
+        help="Disallows ngrams of this size or greater being repeated in generated output."
+        )
+    parser.add_argument(
+        "--early_stopping",
+        type=str2bool,
+        default=False,
+        help="Stop once num_beams have been completed?"
+        )
+    parser.add_argument(
+        "--truncate",
+        type=str2bool,
+        default=True,
+        help="Whether to truncate inputs and targets to specified max levels."
+        )
+    parser.add_argument(
+        "--ban_definienda",
+        type=str2bool,
+        default=False,
+        help="Whether to disallow definienda from being generated in output."
+        )
+
     args = parser.parse_args()
 
     # Sanity checks
@@ -391,9 +460,8 @@ def parse_args():
     return args
 
 
-def main():
-    # Parse the arguments
-    args = parse_args()  
+
+def main(args):
     
     # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
     accelerator = Accelerator()
@@ -460,8 +528,13 @@ def main():
     # See more about loading any type of standard or custom dataset (from files, python dict, pandas DataFrame, etc) at
     # https://huggingface.co/docs/datasets/loading_datasets.html.
 
+
     # Load pretrained model and tokenizer
-    #
+        
+    # Revise T5 source code prior to instantiating any of its classes
+    if args.resid_wt:
+        revise_residuals(args.resid_wt)
+    
     # In distributed training, the .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
     if args.config_name:
@@ -472,24 +545,35 @@ def main():
         config = CONFIG_MAPPING[args.model_type]()
         logger.warning("You are instantiating a new config instance from scratch.")
     
+    # Update config with args
+    config = config.from_dict(vars(args))
+    
     if args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name, use_fast=not args.use_slow_tokenizer)
     elif args.model_name_or_path:
-        tokenizer = TokenizerWithXMask.from_pretrained(args.model_name_or_path, use_fast=not args.use_slow_tokenizer)
+        if not "tiny" in args.model_name_or_path:
+            tokenizer = TokenizerWithXMask.from_pretrained(args.model_name_or_path, use_fast=not args.use_slow_tokenizer)
+        else: # Using tiny model - not compatible with TokenizerWithXMask
+            tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=not args.use_slow_tokenizer)
     else:
         raise ValueError(
             "You are instantiating a new tokenizer from scratch. This is not supported by this script."
             "You can do it from another script, save it, and load it from here, using --tokenizer_name."
         )
-    
-    print("Vocab size:", len(tokenizer))
-    
+        
     if args.model_name_or_path:
-        model = MT5WithXMask.from_pretrained(
-            args.model_name_or_path,
-            from_tf=bool(".ckpt" in args.model_name_or_path),
-            config=config,
-        )
+        if not "tiny" in args.model_name_or_path:
+            model = MT5WithXMask.from_pretrained(
+                args.model_name_or_path,
+                from_tf=bool(".ckpt" in args.model_name_or_path),
+                config=config,
+            )
+        else: # Using tiny model - not compatible with MT5WithXMask
+            model = AutoModelForSeq2SeqLM.from_pretrained(
+                args.model_name_or_path,
+                from_tf=bool(".ckpt" in args.model_name_or_path),
+                # config=config,
+            )
     else:
         logger.info("Training new model from scratch")
         model = MT5WithXMask.from_config(config)
@@ -501,9 +585,10 @@ def main():
  
     # special_tokens_dict = {"mask_token": "<MASK>", "sep_token": " <MASK>"}
     # tokenizer.add_special_tokens(special_tokens_dict)
-    
     # model.resize_token_embeddings(len(tokenizer))
-    print("Vocab size:", len(tokenizer))
+    
+    for item in sorted(model.config.to_dict().items()):
+        print(item)
 
     # Set decoder_start_token_id to the the language code of the target language (!)
     if model.config.decoder_start_token_id is None and isinstance(tokenizer, (MBartTokenizer, MBartTokenizerFast)):
@@ -542,21 +627,37 @@ def main():
         
     # May need to edit this if train and validation datasets have different data_task
     def preprocess_function(examples):
-        input_label = source_lang
-        target_label = target_lang
         
+        
+        # Set input and target keys
         if args.data_task == "definition":
-            input_label = args.input_column if args.input_column == "input" else input_label + '_' + args.input_column
-            target_label += "_gloss"
+            
+            if args.input_column == "input":
+                input_label = args.input_column
+            else:
+                input_label = source_lang + '_' + args.input_column
+                
+            if args.target_column == "target":
+                target_label = args.target_column
+            else:
+                target_label = target_lang + '_' + args.target_column
+        
+        elif args.data_task == "translation":
+            input_label = source_lang
+            target_label = target_lang
+        
+        else:
+            raise KeyError("Need to specify how to handle data if data_task"
+                           "is not 'definition' or 'translation'.")
             
         inputs = [ex[input_label] for ex in examples[args.data_task]]
         targets = [ex[target_label] for ex in examples[args.data_task]]
         inputs = [prefix + inp for inp in inputs]
-        model_inputs = tokenizer(inputs, max_length=args.max_source_length, padding=padding, truncation=True)
+        model_inputs = tokenizer(inputs, max_length=args.max_source_length, padding=padding, truncation=args.truncate)
 
         # Setup the tokenizer for targets
         with tokenizer.as_target_tokenizer():
-            labels = tokenizer(targets, max_length=max_target_length, padding=padding, truncation=True)
+            labels = tokenizer(targets, max_length=max_target_length, padding=padding, truncation=args.truncate)
 
         # If we are padding here, replace all tokenizer.pad_token_id in the labels by -100 when we want to ignore
         # padding in the loss.
@@ -567,28 +668,40 @@ def main():
 
         model_inputs["labels"] = labels["input_ids"]
         return model_inputs
-
-    with accelerator.main_process_first():
+    
+    with accelerator.main_process_first():             
         processed_datasets = raw_datasets.map(
-            preprocess_function,
-            batched=True,
-            num_proc=args.preprocessing_num_workers,
-            remove_columns=column_names,
-            # load_from_cache_file=not args.overwrite_cache,
-            load_from_cache_file=False,
-            desc="Running tokenizer on dataset",
+        preprocess_function,
+        batched=True,
+        num_proc=args.preprocessing_num_workers,
+        remove_columns=column_names,
+        load_from_cache_file=not args.overwrite_cache,
+        # load_from_cache_file=False,
+        desc="Running tokenizer on dataset",
         )
         
-        # Filter out inputs that are too long (rather than truncate)
-        processed_datasets = processed_datasets.filter(lambda ex:
-                                                       len(ex['input_ids']) < args.max_source_length and 
-                                                       len(ex['labels']) < max_target_length
-                                                       )
+        for ex in processed_datasets["train"]["input_ids"][:5]:
+            print("Example input length:", len(ex))
+        
+        # This doesn't work well with mixed inputs
+        # Filter out inputs where the definiendum has been cut off in truncation.
+        if args.demarcator is not None:
+            init_length = len(processed_datasets["train"])
             
+            # check for both demarcators
+            demarc_id = tokenizer.convert_tokens_to_ids(args.demarcator)
+            processed_datasets = processed_datasets.filter(lambda ex:
+                                                            ex['input_ids'].count(demarc_id) == 2
+                                                            )
+            end_length = len(processed_datasets["train"])
+            dropped = init_length - end_length
+            print(f"{dropped} examples filtered out due to definiendum getting lost in truncation.")
+            
+        
         # Add cross-attention mask, remove definiendum span markers
         if args.mask_context:
             processed_datasets = processed_datasets.map(lambda x:
-                                                    prepare_for_xattn(x, tokenizer, args.demarcator),
+                                                    prepare_for_xattn(x, tokenizer, args.demarcator, args.mask_eos),
                                                     desc="Adding cross-attention mask")
         
     train_dataset = processed_datasets["train"]
@@ -596,15 +709,16 @@ def main():
     print("Num eval examples: ", eval_dataset)
     
     # Confirm attention mask works properly
-    examp = eval_dataset[-1]
-    examp_full = zip(tokenizer.convert_ids_to_tokens(examp['input_ids']),
-                examp['input_ids'],
-                examp['attention_mask'],
-                examp['cross_attention_mask']
-                )
-    for tok in examp_full:
-        print("Eval example:", tok)
-    print()
+    if args.mask_context:
+        examp = eval_dataset[-2]
+        examp_full = zip(tokenizer.convert_ids_to_tokens(examp['input_ids']),
+                    examp['input_ids'],
+                    examp['attention_mask'],
+                    examp['cross_attention_mask']
+                    )
+        for tok in examp_full:
+            print("Eval example:", tok)
+        print()
 
      # DataLoaders creation:
     label_pad_token_id = -100 if args.ignore_pad_token_for_loss else tokenizer.pad_token_id
@@ -628,6 +742,11 @@ def main():
     )
     eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=args.per_device_eval_batch_size)
 
+    # Get a list of the definienda for each batch (to ban them in output)
+    demarc_id = tokenizer.convert_tokens_to_ids(args.demarcator)
+    if args.ban_definienda:
+        definienda = get_batched_definienda(eval_dataloader, args.mask_context, demarc_id, tokenizer)
+    
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.
     no_decay = ["bias", "LayerNorm.weight"]
@@ -668,7 +787,7 @@ def main():
         num_warmup_steps=args.num_warmup_steps,
         num_training_steps=args.max_train_steps,
     )
-
+    
     metric = load_metric("sacrebleu")
 
     def postprocess_text(preds, labels):
@@ -679,20 +798,21 @@ def main():
     
 
     # Train!
-
+       
     if args.report_to == "wandb":
-        
+
         tags = args.tags.split(",") if args.tags else None
 
         # Report hyperparameters
-        wb_config = config.to_dict()
-        wb_config.update(vars(args))
+        wb_config = model.config.to_dict()
+        # wb_config.update(vars(args))
                 
         wandb.init(
             project=args.wandb_proj,
             notes=args.notes,
             tags=tags,
-            config=wb_config
+            config=wb_config,
+            allow_val_change=True
             )
         
         if args.output_dir == "wandb_run":
@@ -743,47 +863,49 @@ def main():
                     gen_kwargs = {
                         "max_length": args.val_max_target_length if args is not None else config.max_length,
                         "num_beams": args.num_beams,
+                        "no_repeat_ngram_size": model.config.no_repeat_ngram_size,
+                        "repetition_penalty": model.config.repetition_penalty,
+                        "early_stopping": model.config.early_stopping,
                     }
                     for eval_step, batch in enumerate(eval_dataloader):
-                        with torch.no_grad():
-                            
-                            outputs = model(**batch)
-                            loss += outputs.loss             # Gradient accumulating
-                            
-                            outputs = accelerator.unwrap_model(model).generate(
-                                batch["input_ids"],
-                                attention_mask=batch["attention_mask"],
-                                **gen_kwargs,
-                                no_repeat_ngram_size=3,
-                                repetition_penalty=1,
-                                early_stopping=True,
-                                return_dict_in_generate=True,
-                                output_scores=True
-                            )
-                            
-                            generated_tokens = outputs.sequences
-                            
-                            generated_tokens = accelerator.pad_across_processes(
-                                generated_tokens, dim=1, pad_index=tokenizer.pad_token_id
-                            )
-                            labels = batch["labels"]
-                            if not args.pad_to_max_length:
-                                # If we did not pad to max length, we need to pad the labels too
-                                labels = accelerator.pad_across_processes(batch["labels"], dim=1, pad_index=tokenizer.pad_token_id)
-            
-                            generated_tokens = accelerator.gather(generated_tokens).cpu().numpy()
-                            labels = accelerator.gather(labels).cpu().numpy()
-                                    
-                            if args.ignore_pad_token_for_loss:
-                                # Replace -100 in the labels as we can't decode them.
-                                labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-            
-                            decoded_preds = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-                            decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-            
-                            decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
-    
-                            metric.add_batch(predictions=decoded_preds, references=decoded_labels)
+                        if not eval_step == len(eval_dataloader) - 1: # Skip last batch, since it is often partial.
+                            with torch.no_grad():               # Want to see full results.
+                                
+                                outputs = model(**batch)
+                                loss += outputs.loss             # Gradient accumulating
+                                
+                                outputs = accelerator.unwrap_model(model).generate(
+                                    batch["input_ids"],
+                                    attention_mask=batch["attention_mask"],
+                                    bad_words_ids=definienda[eval_step] if args.ban_definienda else None,
+                                    **gen_kwargs,
+                                    return_dict_in_generate=True,
+                                    output_scores=True
+                                )
+                                
+                                generated_tokens = outputs.sequences
+                                
+                                generated_tokens = accelerator.pad_across_processes(
+                                    generated_tokens, dim=1, pad_index=tokenizer.pad_token_id
+                                )
+                                labels = batch["labels"]
+                                if not args.pad_to_max_length:
+                                    # If we did not pad to max length, we need to pad the labels too
+                                    labels = accelerator.pad_across_processes(batch["labels"], dim=1, pad_index=tokenizer.pad_token_id)
+                
+                                generated_tokens = accelerator.gather(generated_tokens).cpu().numpy()
+                                labels = accelerator.gather(labels).cpu().numpy()
+                                        
+                                if args.ignore_pad_token_for_loss:
+                                    # Replace -100 in the labels as we can't decode them.
+                                    labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+                
+                                decoded_preds = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+                                decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+                
+                                decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
+        
+                                metric.add_batch(predictions=decoded_preds, references=decoded_labels)
                     print("Epochs completed:", epoch+(train_step+1)/len(train_dataloader))
                     for pred in zip(decoded_preds, decoded_labels):
                         print()
@@ -800,6 +922,7 @@ def main():
                                    'eval/loss': val_loss,
                                    'eval/perplexity': val_ppl,
                                    'eval/bleu': eval_metric['score'],
+                                   'eval/length': eval_metric['sys_len']/len(eval_dataloader)
                                    })
                 if completed_steps >= args.max_train_steps:
                     break
@@ -819,5 +942,10 @@ def main():
                     repo.push_to_hub(commit_message="End of training", auto_lfs_prune=True)
 
 if __name__ == "__main__":
-
-    main()
+    
+    # sys.argv = ['run_model.py', '--file', 'train_args_codwoe_tiny.txt'] # Uncomment this to run in IDE
+    
+    # Parse the arguments
+    args = parse_args()  
+    
+    main(args)

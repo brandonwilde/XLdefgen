@@ -49,6 +49,7 @@ definiendum span markers are also used in the data not to be masked.
 --input_column  (str)	# column header ('input', 'marked', 'prepend', etc.)  
 --demarcator  (str)	# definiendum marker ("*", "<extra_id_99>", etc.)  
 --mask_context  (bool)	# whether to mask context based on definiendum markers  
+--resid_wt (float)	# 0-1 (0 = no residual, 0.5 = normal, 1 = no attention)
 
 --seed  
 --per_device_train_batch_size  

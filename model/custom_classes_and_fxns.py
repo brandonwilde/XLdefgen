@@ -9,10 +9,11 @@ import warnings
 from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 
 import torch
-from torch.nn import CrossEntropyLoss
+from torch.nn import CrossEntropyLoss, Dropout, Module, ModuleList
+from transformers import MT5ForConditionalGeneration, T5Tokenizer
 from transformers.file_utils import PaddingStrategy
 from transformers.tokenization_utils_base import BatchEncoding
-from transformers import MT5ForConditionalGeneration, T5Tokenizer
+from transformers.models.t5 import modeling_t5
 
 from transformers.modeling_outputs import (
     BaseModelOutput,
@@ -33,6 +34,63 @@ EncodedInput = List[int]
 #     replace_return_docstrings,
 # )
 
+
+def get_lowercase_ids(token_ids, tokenizer):
+    """
+    Given the token ids for a word, this will return the token ids
+    corresponding to the lowercase version of the word.
+    """
+    word = tokenizer.decode(token_ids)
+    lower_word = word.lower()
+    
+    return tokenizer.encode(lower_word, add_special_tokens=False)
+
+
+def get_batched_definienda(dataloader, mask_context, demarcator_id, tokenizer):
+    """
+    Get definienda by batch.
+    """
+    if mask_context: # we'll get definienda from cross_attention_masks
+        definienda = []
+        for i, batch in enumerate(dataloader):
+            batch_definienda = []
+            for j, example in enumerate(batch.input_ids):
+                word_ids = [example[k].item() for k in range(len(example)) if batch.cross_attention_mask[j][k] == 1]
+                batch_definienda.append(word_ids)
+                
+                # add lower-cased version of same
+                lower_word_ids = get_lowercase_ids(word_ids, tokenizer)
+                if lower_word_ids != word_ids:
+                    batch_definienda.append(lower_word_ids)
+                    
+            definienda.append(batch_definienda)
+    
+    else: # no cross_attention_masks, but demarcators are present
+        definienda = []
+        for i, batch in enumerate(dataloader):
+            batch_definienda = []
+            for example in batch.input_ids:
+                span = []
+                for j, token_id in enumerate(example):
+                    if token_id == demarcator_id:
+                        span.append(j)
+          
+                if len(span) == 2:    # definiendum span found
+                    word_ids = example[span[0]+1:span[1]].tolist()
+                    batch_definienda.append(word_ids)   # add definiendum
+                    
+                    # add lower-cased version of same
+                    lower_word_ids = get_lowercase_ids(word_ids, tokenizer)
+                    if lower_word_ids != word_ids:
+                        batch_definienda.append(lower_word_ids)
+                    
+            definienda.append(batch_definienda) # add batch
+    
+    return definienda
+
+
+
+
 # Warning messafe for FutureWarning: head_mask was separated into two input args - head_mask, decoder_head_mask
 __HEAD_MASK_WARNING_MSG = """
 The input argument `head_mask` was split into two arguments `head_mask` and `decoder_head_mask`. Currently,
@@ -43,6 +101,61 @@ num_heads)`.
 
 _CONFIG_FOR_DOC = "T5Config"
 
+def revise_residuals(residual_weight: float = 0.5):
+    """
+    Revise T5 internal layers to do weighted sum of attention scores and residual connections.
+    """
+    class T5LayerSelfAttentionRevisedResidual(modeling_t5.T5LayerSelfAttention):
+        """
+        This will adapt the former self-attention module to enable weighting of the residual connection sum.
+        """
+
+        def forward(
+            self,
+            hidden_states,
+            attention_mask=None,
+            position_bias=None,
+            layer_head_mask=None,
+            past_key_value=None,
+            use_cache=False,
+            output_attentions=False,
+        ):
+            normed_hidden_states = self.layer_norm(hidden_states)
+            attention_output = self.SelfAttention(
+                normed_hidden_states,
+                mask=attention_mask,
+                position_bias=position_bias,
+                layer_head_mask=layer_head_mask,
+                past_key_value=past_key_value,
+                use_cache=use_cache,
+                output_attentions=output_attentions,
+            )
+            
+            # Edited portion
+            hidden_states = 2*(residual_weight*hidden_states + (1-residual_weight)*self.dropout(attention_output[0]))
+            
+            outputs = (hidden_states,) + attention_output[1:]  # add attentions if we output them
+            
+            return outputs
+
+    # modeling_t5.T5LayerSelfAttention = T5LayerSelfAttentionRevisedResidual 
+    
+    class T5BlockRevisedResidual(modeling_t5.T5Block, Module):
+        def __init__(self, config, has_relative_attention_bias=False):
+            Module.__init__(self)
+            self.is_decoder = config.is_decoder
+            self.layer = ModuleList()
+            if self.is_decoder:
+                self.layer.append(modeling_t5.T5LayerSelfAttention(config, has_relative_attention_bias=has_relative_attention_bias))
+                self.layer.append(modeling_t5.T5LayerCrossAttention(config))
+            
+            # Edited portion
+            else: # if is encoder
+                self.layer.append(T5LayerSelfAttentionRevisedResidual(config, has_relative_attention_bias=has_relative_attention_bias))
+
+            self.layer.append(modeling_t5.T5LayerFF(config))
+            
+    modeling_t5.T5Block = T5BlockRevisedResidual
 
 
 def remove_def_markers(example, def_span_indices):
@@ -60,28 +173,24 @@ def remove_def_markers(example, def_span_indices):
     return example
 
 
-def prepare_for_xattn(example, tokenizer, demarcator):
+def prepare_for_xattn(example, tokenizer, demarcator, mask_eos):
     """
     Add cross-attention mask and remove temporary definiendum span markers
     from the data.
     """
-    # Only definiendum span and eos_token will be unmasked for cross-attention
-    def_ids = tokenizer.convert_tokens_to_ids([demarcator, tokenizer.eos_token])
-    def_indices = []
     sent = example['input_ids']
     
+    # Find definiendum span
+    demarc_id = tokenizer.convert_tokens_to_ids(demarcator)
+    demarc_indices = []
+    
     for i, token_id in enumerate(sent):
-        if token_id in def_ids:
-            def_indices.append(i)
+        if token_id == demarc_id:
+            demarc_indices.append(i)
             
-    # assert len(def_indices) == 3, "Definiendum span not found. def_indices should consist of 3 integers but is instead " + str(def_indices) + " (Length: " + str(len(sent)) + ")\n" + tokenizer.decode(sent)
-    if len(def_indices) == 3: # Definiendum span found (plus eos token).
-        begin,end = def_indices[:2]
-        eos_index = def_indices[-1]
-        
-    elif len(def_indices) == 1: # Definiendum span not found (just eos token).
-        begin,end = [0,len(sent)-1]
-        eos_index = def_indices[0]
+    # assert len(demarc_indices) == 3, "Definiendum span not found. demarc_indices should consist of 3 integers but is instead " + str(demarc_indices) + " (Length: " + str(len(sent)) + ")\n" + tokenizer.decode(sent)
+    if len(demarc_indices) == 2: # Definiendum span found.
+        begin,end = demarc_indices
     
     else:
         raise Exception("Did not find two definiendum markers.\n" + tokenizer.decode(sent))
@@ -89,12 +198,22 @@ def prepare_for_xattn(example, tokenizer, demarcator):
     # Mask everything except for definiendum
     cross_attention_mask = [0]*len(sent)
     cross_attention_mask[begin:end] = [1]*(end-begin)
-    cross_attention_mask[eos_index] = 1
+    
+    # Optionally unmask eos_token
+    if not mask_eos:
+        eos_id = tokenizer.convert_tokens_to_ids(tokenizer.eos_token)
+        for i, token_id in enumerate(sent):
+            if token_id == eos_id:
+                eos_index = i  # store final occurence of eos_token
+
+        cross_attention_mask[eos_index] = 1
+    
+    # Add mask to inputs
     example['cross_attention_mask'] = cross_attention_mask
     
     # Remove definiendum markers
-    if len(def_indices) == 3: # Definiendum markers found
-        example = remove_def_markers(example, (begin,end))
+    if len(demarc_indices) == 2: # Definiendum markers found
+        example = remove_def_markers(example, demarc_indices)
     
     return example
 

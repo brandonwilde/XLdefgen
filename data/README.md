@@ -1,3 +1,44 @@
+## Prepare data
+
+For use when preparing a dataset from a list of words, glosses, and
+sample sentences. Use prepare_data.py to mark the definiendum in example sentences,
+prepend the definiendum to example sentences, or both.
+This will also remove any examples where the definiendum does not
+occur in the example sentence.
+
+Usage:
+```bash
+python prepare_data.py \
+	--input_file codwoe/codwoe_test_de.csv \
+	--source_lang de \
+	--target_lang en \
+	--mark \
+	--demarcator "<extra_id_99>" \
+	--allow 1 \
+	--drop_columns \
+	--output_file codwoe_test_de_marked.json
+```
+
+Specify which language should be processed and how lenient the wordmatcher
+should be (kwarg: allow). The allowance is based on Minimum Edit Distance,
+and will accept 0, 1, and 2 as inputs, with 0 restricting the matcher to
+exact matches, and 2 permitting an MED of up to 2.
+
+The outputs will be labeled 'input' and 'target'.
+
+Below are all arguments that may be passed when executing this script.
+
+--input_file (str)	# csv data file
+--source_lang (str)	# language for inputs
+--target_lang (str)	# language for targets (glosses)
+--mark (flag)		# if passed, definiendum will be marked in example sents
+--demarcator (str)	# symbol to use for marking definiendum
+--prepend (flag)		# if passed, definiendum will be prepended to example sentence
+--allow (int)		# maximum allowable MED when matching definiendum in example sent
+--drop_columns (flag)	# if passed, only input and target columns will be output
+--output_file (str)	# json data file
+
+
 ## Split data
 
 For use when you need to split training and test data, or if you need
@@ -23,36 +64,3 @@ python split_data.py \
 	--save_path wmt16_de-en \
 	--seed 42
 ```
-
-## Mark data
-
-For use when preparing a dataset from a list of words, glosses, and
-sample sentences. Use mark_data.py to mark the definiendum in each
-sample sentence, and remove any examples where the definiendum does not
-occur in the sample sentence.
-
-Usage:
-```bash
-python mark_data.py \
-	--input_file codwoe_test_de.csv \
-	--lang de \
-	--allow 1 \
-	--output_file codwoe_test_de_marked.json
-```
-
-Specify which language should be processed and how lenient the wordmatcher
-should be (kwarg: allow). The allowance is based on Minimum Edit Distance,
-and will accept 0, 1, and 2 as inputs, with 0 restricting the matcher to
-exact matches, and 2 permitting an MED of up to 2.
-
-This will also automatically create a column called 'input' holding the
-processed data.
-
-Below are all arguments that may be passed when executing this script.
-
---input_file (str)	# csv data file
---lang (str)		# which language to process
---mark (flag)		# if passed, definiendum will be marked in example sents
---prepend (flag)		# if passed, definiendum will be prepended to example sentence
---allow (int)		# maximum allowable MED when matching definiendum in example sent
---output_file (str)	# json data file
