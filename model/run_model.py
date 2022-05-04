@@ -372,7 +372,7 @@ def parse_args():
     parser.add_argument(
         "--demarcator",
         type=str,
-        default="",
+        default="<extra_id_99>",
         help="The string/symbol used to demarcate the definiendum in the example sentence."
     )
     parser.add_argument(
@@ -451,6 +451,12 @@ def parse_args():
         help="If passed along with '--generate', outputs will be generated"
             "Indicate definiendum by prepending a '*' to it, and separate"
             "sentences with a '/'."
+        )
+    parser.add_argument(
+        "--num_return_sequences",
+        type=int,
+        default=1,
+        help="Number of outputs to generate per input."
         )
     
     args = parser.parse_args()
@@ -963,10 +969,21 @@ def main(args):
     
     if args.generate:
         
+        import regex as re
+        
         inputs = args.sentences.split(' / ')
-        
-        # Reformat inputs?
-        
+
+        # Demarcate definienda
+        for i,sent in enumerate(inputs):
+            try:
+                start = sent.index('*')
+            except:
+                raise Exception("Please mark the definiendum by placing a '*' before it.")
+                
+            end = start + re.search('\W', sent[start+1:]).span()[1]
+            word = sent[start+1:end]
+            inputs[i] = sent[:start]+' '+args.demarcator+' '+word+' '+args.demarcator+' '+sent[end:]
+            
         config = AutoConfig.from_pretrained(args.model_name_or_path)
         
         # Update config with args
@@ -991,26 +1008,26 @@ def main(args):
         
         inputs = [prefix + inp for inp in inputs]
         
-        print(inputs)
-
         input_ids = tokenizer(inputs, padding=True, return_tensors='pt').input_ids
-        print(input_ids)
 
         # Add xattn mask?
         # Get and ban definienda?
         
         outputs = model.generate(input_ids)
-        print(outputs)
-        print(*(sent for sent in tokenizer.batch_decode(outputs, skip_special_tokens=True)))
-        
+        print('Outputs:')
+        for sent in tokenizer.batch_decode(outputs, skip_special_tokens=True):
+            print(sent) 
         
 if __name__ == "__main__":
     
     # sys.argv = ['run_model.py', '--file', 'train_args_codwoe_tiny.txt'] # Uncomment this to run in IDE
     sys.argv = ['run_model.py', '--generate',
-                '--model_name_or_path', 'google/mt5-small',
-                '--source_prefix', 'Summarize: ',
-                '--sentences', 'The bride was elegance personified. / The aroma of the flowers.']
+                '--model_name_or_path', 'checkpoints/logical-lake-42',
+                # "--num_return_sequences", "3",
+                '--num_beams', '5',
+                '--no_repeat_ngram_size', '1',
+                '--sentences', 'Die Braut war die *Eleganz in Person. / The *aroma of the flowers. / Yo *quiero ser doctor. / einen *aufsichtsrechtlichen Ausschuss.'
+                ]
     
     # Parse the arguments
     args = parse_args()  
