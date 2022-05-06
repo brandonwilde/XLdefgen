@@ -1,3 +1,4 @@
+accelerate==0.5.1
 aiohttp==3.8.1
 aiosignal==1.2.0
 alabaster==0.7.12
@@ -13,9 +14,12 @@ autopep8==1.6.0
 Babel==2.9.1
 backcall==0.2.0
 bcrypt==3.2.0
+bertviz==1.4.0
 binaryornot==0.4.4
 black==19.10b0
 bleach==4.1.0
+boto3==1.21.39
+botocore==1.24.39
 brotlipy==0.7.0
 certifi==2021.10.8
 cffi==1.15.0
@@ -58,6 +62,7 @@ isort==5.9.3
 jedi==0.18.0
 Jinja2==2.11.3
 jinja2-time==0.2.0
+jmespath==1.0.0
 joblib==1.1.0
 jsonschema==3.2.0
 jupyter-client==6.1.12
@@ -77,6 +82,7 @@ nbclient==0.5.3
 nbconvert==6.1.0
 nbformat==5.1.3
 nest-asyncio==1.5.1
+nltk==3.7
 notebook==6.4.6
 numpy==1.22.1
 numpydoc==1.1.0
@@ -135,11 +141,16 @@ regex==2022.1.18
 requests==2.27.1
 rope==0.21.1
 Rtree==0.9.7
+s3transfer==0.5.2
 sacrebleu==2.0.0
 sacremoses==0.0.47
+scikit-learn==1.0.2
+scipy==1.8.0
 Send2Trash==1.8.0
+sentence-transformers==2.2.0
 sentencepiece==0.1.96
 sentry-sdk==1.5.4
+setproctitle==1.2.2
 setuptools==58.0.4
 shortuuid==1.0.8
 sip==4.19.13
@@ -163,6 +174,7 @@ terminado==0.9.4
 testpath==0.5.0
 text-unidecode==1.3
 textdistance==4.2.1
+threadpoolctl==3.1.0
 three-merge==0.1.1
 tinycss==0.4
 tokenizers==0.11.4
@@ -173,13 +185,13 @@ torchvision==0.11.3+cu113
 tornado==6.1
 tqdm==4.62.3
 traitlets==5.1.1
-transformers==4.16.0
+transformers==4.18.0.dev0
 typed-ast==1.4.3
 typing_extensions==4.0.1
 ujson==4.0.2
 Unidecode==1.2.0
 urllib3==1.26.8
-wandb==0.12.9
+wandb==0.12.11
 watchdog==2.1.6
 wcwidth==0.2.5
 webencodings==0.5.1
