@@ -1056,8 +1056,8 @@ def main(args):
         
 if __name__ == "__main__":
     
-    sys.argv = ['run_model.py',
-                '--file', 'train_args_codwoe_tiny.txt'] # Uncomment this to run in IDE
+    # sys.argv = ['run_model.py',
+    #             '--file', 'train_args_codwoe_tiny.txt'] # Uncomment this to run in IDE
     # sys.argv = ['run_model.py', '--generate',
     #             # '--model_name_or_path', 'checkpoints/logical-lake-42',
     #             '--model_name_or_path', '/data/wildeb1-data/checkpoints/dainty-moon-65',
