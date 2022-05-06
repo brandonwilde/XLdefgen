@@ -372,7 +372,7 @@ def parse_args():
     parser.add_argument(
         "--demarcator",
         type=str,
-        default="<extra_id_99>",
+        default=None,
         help="The string/symbol used to demarcate the definiendum in the example sentence."
     )
     parser.add_argument(
@@ -435,11 +435,11 @@ def parse_args():
         default=False,
         help="Whether to disallow definienda from being generated in output."
         )
-    parser.add_argument(
-        "--train",
-        action="store_true",
-        help="Train the model."
-        )
+    # parser.add_argument(
+    #     "--train",
+    #     action="store_true",
+    #     help="Train the model."
+    #     )
     parser.add_argument(
         "--generate",
         action="store_true",
@@ -486,7 +486,7 @@ def parse_args():
 
 def main(args):
     
-    if args.train:
+    if args.train_file:
         
         # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
         accelerator = Accelerator()
@@ -814,6 +814,32 @@ def main(args):
         )
         
         metric = load_metric("sacrebleu")
+        
+        # class Metrics:
+        #     def __init__(self, metric_dict):
+        #         self._metric_dict = metric_dict
+                
+        #     def add_batch(self, preds, labels):
+        #         for metric in self._metric_dict:
+        #             self._metric_dict[metric].add_batch(predictions=preds,references=labels)
+                    
+        
+        # def compute_metrics(predictions, labels):
+        #     metric1 = load_metric("sacrebleu")
+        #     # metric2 = load_metric("")
+            
+        #     bleu = metric1.compute(predictions=predictions, references=labels)['score']
+        #     length = metric1.compute(predictions=predictions, references=labels)['sys_len']/len(eval_dataloader)
+        
+        # if args.cos_sim:
+        from sentence_transformers import SentenceTransformer, util
+        emb_model = SentenceTransformer('all-MiniLM-L6-v2')
+        
+        def cos_similarity(sent1, sent2):
+            """Calculate cosine similarity of two sentences"""
+            sent_embs = emb_model.encode([sent1, sent2])
+            cos = util.cos_sim(*sent_embs)
+            return round(cos.item(), 3)
     
         def postprocess_text(preds, labels):
             preds = [pred.strip() for pred in preds]
@@ -821,7 +847,7 @@ def main(args):
     
             return preds, labels
         
-    
+        
         # Train!
            
         if args.report_to == "wandb":
@@ -891,7 +917,10 @@ def main(args):
                             "no_repeat_ngram_size": model.config.no_repeat_ngram_size,
                             "repetition_penalty": model.config.repetition_penalty,
                             "early_stopping": model.config.early_stopping,
-                        }
+                            }
+                        batch_cos = []
+                        leng = []
+                        
                         for eval_step, batch in enumerate(eval_dataloader):
                             if not eval_step == len(eval_dataloader) - 1: # Skip last batch, since it is often partial.
                                 with torch.no_grad():               # Want to see full results.
@@ -931,6 +960,10 @@ def main(args):
                                     decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
             
                                     metric.add_batch(predictions=decoded_preds, references=decoded_labels)
+                                    
+                                    sample_cos = [cos_similarity(pred,lab[0]) for pred,lab in zip(decoded_preds, decoded_labels)]
+                                    batch_cos.append(sum(sample_cos)/len(sample_cos))
+                                    
                         print("Epochs completed:", epoch+(train_step+1)/len(train_dataloader))
                         for pred in zip(decoded_preds, decoded_labels):
                             print()
@@ -939,6 +972,8 @@ def main(args):
                         val_loss = loss/len(eval_dataloader)
                         val_ppl = round(math.exp(val_loss),4)
                         eval_metric = metric.compute()
+                        ave_cos = round(sum(batch_cos)/len(batch_cos), 4)
+                        
                         logger.info({"bleu": eval_metric["score"]})
                         if args.report_to == "wandb":
                             wandb.log({'epoch': epoch+(train_step+1)/len(train_dataloader),
@@ -947,7 +982,8 @@ def main(args):
                                        'eval/loss': val_loss,
                                        'eval/perplexity': val_ppl,
                                        'eval/bleu': eval_metric['score'],
-                                       'eval/length': eval_metric['sys_len']/len(eval_dataloader)
+                                       'eval/length': eval_metric['sys_len']/len(eval_dataloader),
+                                       'eval/cos_sim': ave_cos
                                        })
                     if completed_steps >= args.max_train_steps:
                         break
@@ -1020,14 +1056,16 @@ def main(args):
         
 if __name__ == "__main__":
     
-    # sys.argv = ['run_model.py', '--file', 'train_args_codwoe_tiny.txt'] # Uncomment this to run in IDE
-    sys.argv = ['run_model.py', '--generate',
-                '--model_name_or_path', 'checkpoints/logical-lake-42',
-                # "--num_return_sequences", "3",
-                '--num_beams', '5',
-                '--no_repeat_ngram_size', '1',
-                '--sentences', 'Die Braut war die *Eleganz in Person. / The *aroma of the flowers. / Yo *quiero ser doctor. / einen *aufsichtsrechtlichen Ausschuss.'
-                ]
+    sys.argv = ['run_model.py',
+                '--file', 'train_args_codwoe_tiny.txt'] # Uncomment this to run in IDE
+    # sys.argv = ['run_model.py', '--generate',
+    #             # '--model_name_or_path', 'checkpoints/logical-lake-42',
+    #             '--model_name_or_path', '/data/wildeb1-data/checkpoints/dainty-moon-65',
+    #             # "--num_return_sequences", "3",
+    #             '--num_beams', '5',
+    #             '--no_repeat_ngram_size', '1',
+    #             '--sentences', 'Die Braut war die *Eleganz in Person. / The *aroma of the flowers. / Yo *quiero ser doctor. / einen *aufsichtsrechtlichen Ausschuss.'
+    #             ]
     
     # Parse the arguments
     args = parse_args()  
