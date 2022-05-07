@@ -1,8 +1,8 @@
 --model_name_or_path	google/mt5-small
 
 --data_task		definition
---train_file		../data/codwoe/train/codwoe_train_en_double.json
---validation_file	../data/codwoe/validation/codwoe_val_de_double.json
+--train_file		../data/codwoe/train/codwoe_train_de_20.json
+--validation_file	../data/codwoe/validation/codwoe_val_de.json
 
 --source_lang		de
 --target_lang		en
@@ -13,13 +13,13 @@
 --mask_context		False
 --mask_eos		True
 --truncate		True
---per_device_train_batch_size	2
---per_device_eval_batch_size 	7
+--per_device_train_batch_size	1
+--per_device_eval_batch_size 	6
 --log_frequency		1000
---learning_rate		2e-4
+--learning_rate		2e-5
 --weight_decay		0.01
---num_train_epochs	3
---gradient_accumulation_steps	2
+--num_train_epochs	1
+--gradient_accumulation_steps	1
 --resid_wt		0.5
 
 --ban_definienda	True
@@ -30,5 +30,5 @@
 --num_warmup_steps	0
 --output_dir		wandb_run
 --report_to		wandb
---wandb_proj		def_train
+--wandb_proj		XLfewshot
 --seed			42

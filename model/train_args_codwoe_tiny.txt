@@ -1,11 +1,11 @@
 --model_name_or_path	stas/mt5-tiny-random
 
 --data_task			definition
---train_file		../data/codwoe/codwoe_train_en_tiny.json
---validation_file		../data/codwoe/codwoe_val_de_tiny.json
+--train_file		../data/codwoe/train/codwoe_train_en_tiny.json
+--validation_file		../data/codwoe/validation/codwoe_val_de_tiny.json
 
 --source_lang		en
---target_lang		en
+--target_lang		de
 --max_source_length	64
 --max_target_length	64
 --source_prefix		""
