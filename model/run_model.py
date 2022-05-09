@@ -486,7 +486,8 @@ def parse_args():
 
 def main(args):
     
-    if args.train_file:
+    
+    if not (args.train_file == None or args.train_file == "None"):
         
         # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
         accelerator = Accelerator()
@@ -988,19 +989,19 @@ def main(args):
                     if completed_steps >= args.max_train_steps:
                         break
     
-            # Save at end of each epoch
-            accelerator.wait_for_everyone()
-            unwrapped_model = accelerator.unwrap_model(model)
-            unwrapped_model.save_pretrained(ckpt_path + args.output_dir, save_function=accelerator.save)
-            if accelerator.is_main_process:         # Only do once, if distributed
-                tokenizer.save_pretrained(ckpt_path + args.output_dir)
-                if args.push_to_hub:
-                    if epoch < args.num_train_epochs - 1:
-                        repo.push_to_hub(
-                            commit_message=f"Training in progress - epoch {epoch}", blocking=False, auto_lfs_prune=True
-                        )
-                    else:
-                        repo.push_to_hub(commit_message="End of training", auto_lfs_prune=True)
+            # # Save at end of each epoch
+            # accelerator.wait_for_everyone()
+            # unwrapped_model = accelerator.unwrap_model(model)
+            # unwrapped_model.save_pretrained(ckpt_path + args.output_dir, save_function=accelerator.save)
+            # if accelerator.is_main_process:         # Only do once, if distributed
+            #     tokenizer.save_pretrained(ckpt_path + args.output_dir)
+            #     if args.push_to_hub:
+            #         if epoch < args.num_train_epochs - 1:
+            #             repo.push_to_hub(
+            #                 commit_message=f"Training in progress - epoch {epoch}", blocking=False, auto_lfs_prune=True
+            #             )
+            #         else:
+            #             repo.push_to_hub(commit_message="End of training", auto_lfs_prune=True)
     
     
     if args.generate:
@@ -1018,7 +1019,7 @@ def main(args):
                 
             end = start + re.search('\W', sent[start+1:]).span()[1]
             word = sent[start+1:end]
-            inputs[i] = sent[:start]+' '+args.demarcator+' '+word+' '+args.demarcator+' '+sent[end:]
+            inputs[i] = word+'. '+sent[:start]+' '+args.demarcator+' '+word+' '+args.demarcator+' '+sent[end:]
             
         config = AutoConfig.from_pretrained(args.model_name_or_path)
         
@@ -1054,10 +1055,22 @@ def main(args):
         for sent in tokenizer.batch_decode(outputs, skip_special_tokens=True):
             print(sent) 
         
-if __name__ == "__main__":
     
-    # sys.argv = ['run_model.py',
-    #             '--file', 'train_args_codwoe_tiny.txt'] # Uncomment this to run in IDE
+if __name__ == "__main__":
+   
+    # import gc
+    
+    # for schedule in ['constant', 'linear']:
+    #     for lr in ['2e-5', '4e-5', '6e-5', '8e-5']:
+    #         seed = str(np.random.randint(0,99))
+    #         sys.argv = ['run_model.py', # Uncomment this to run in IDE
+    #                     '--file', 'train_args_fewshot.txt',
+    #                     '--model_name_or_path', '/data/wildeb1-data/checkpoints/vague-flower-59',
+    #                     '--learning_rate', lr,
+    #                     '--lr_scheduler_type', schedule,
+    #                     '--seed', seed,
+    #                     ] 
+
     # sys.argv = ['run_model.py', '--generate',
     #             # '--model_name_or_path', 'checkpoints/logical-lake-42',
     #             '--model_name_or_path', '/data/wildeb1-data/checkpoints/dainty-moon-65',
@@ -1066,8 +1079,9 @@ if __name__ == "__main__":
     #             '--no_repeat_ngram_size', '1',
     #             '--sentences', 'Die Braut war die *Eleganz in Person. / The *aroma of the flowers. / Yo *quiero ser doctor. / einen *aufsichtsrechtlichen Ausschuss.'
     #             ]
-    
+            
     # Parse the arguments
     args = parse_args()  
     
     main(args)
+            # gc.collect()

@@ -31,4 +31,3 @@
 --output_dir		wandb_run
 --report_to		wandb
 --wandb_proj		XLfewshot
---seed			42
