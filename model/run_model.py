@@ -1049,8 +1049,12 @@ def main(args):
 
         # Add xattn mask?
         # Get and ban definienda?
-        
-        outputs = model.generate(input_ids)
+        if args.ban_definienda:
+            definienda = [tokenizer.encode(word, add_special_tokens=False), tokenizer.encode(word.lower(), add_special_tokens=False)]
+
+        outputs = model.generate(input_ids,
+                                 bad_words_ids=definienda if args.ban_definienda == True else None
+                                 )
         print('Outputs:')
         for sent in tokenizer.batch_decode(outputs, skip_special_tokens=True):
             print(sent) 
