@@ -459,6 +459,12 @@ def parse_args():
         help="Number of outputs to generate per input."
         )
     
+    parser.add_argument(
+        "--evaluate",
+        action="store_true",
+        help="Evaluate model."
+        )
+    
     args = parser.parse_args()
 
     # Sanity checks
@@ -1003,8 +1009,321 @@ def main(args):
             #         else:
             #             repo.push_to_hub(commit_message="End of training", auto_lfs_prune=True)
     
+    elif args.evaluate:
+        
+
+
+
+        # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
+        accelerator = Accelerator()
     
-    if args.generate:
+        # Make one log on every process with the configuration for debugging.
+        logging.basicConfig(
+            format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+            datefmt="%m/%d/%Y %H:%M:%S",
+            level=logging.INFO,
+            stream=sys.stdout,
+            filemode='w'
+        )
+        logger.info(accelerator.state)
+        
+        
+        # Use checkpoint configs
+        config = AutoConfig.from_pretrained(args.model_name_or_path)
+        
+        config.source_lang = 'de'
+        config.target_lang = 'en'
+        config.target_column = 'target'
+        config.resid_wt = False
+        config.ban_definienda = False
+        config.max_source_length = 64
+        config.max_target_length = 64
+        config.pad_to_max_length = False
+        config.preprocessing_num_workers = 1
+        config.overwrite_cache = True
+        config.data_task = 'definition'
+        config.input_column = 'input'
+        config.truncate = True
+        config.demarcator = None
+        config.mask_context = False
+        config.ignore_pad_token_for_loss = True
+        config.per_device_eval_batch_size = 7
+        config.report_to = 'wandb'
+        config.tags = ''
+        config.wandb_proj = 'def_train'
+        config.notes = ''
+        config.val_max_target_length = None
+        
+        # Revise T5 source code prior to instantiating any of its classes
+        if config.resid_wt:
+            revise_residuals(config.resid_wt)
+        
+        # Update config with args
+        # config = config.from_dict(vars(args))
+        
+        if not "tiny" in args.model_name_or_path:
+            tokenizer = TokenizerWithXMask.from_pretrained(args.model_name_or_path, use_fast=not args.use_slow_tokenizer)
+            model = MT5WithXMask.from_pretrained(
+                args.model_name_or_path,
+                from_tf=bool(".ckpt" in args.model_name_or_path),
+                config=config,
+                )
+            
+        else: # Using tiny model - not compatible with TokenizerWithXMask
+            tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=not args.use_slow_tokenizer)
+            model = AutoModelForSeq2SeqLM.from_pretrained(
+                args.model_name_or_path,
+                from_tf=bool(".ckpt" in args.model_name_or_path),
+                # config=config,
+            )
+        
+        if config.decoder_start_token_id is None:
+            raise ValueError("Make sure that `config.decoder_start_token_id` is correctly defined")
+        
+        prefix = ''
+        # prefix = config.source_prefix if config.source_prefix is not None else ""
+        
+        if args.dataset_name is not None:
+            # Downloading and loading a dataset from the hub.
+            raw_datasets = load_dataset(args.dataset_name, args.dataset_config_name)
+        else:
+            data_files = {}
+            if args.validation_file is not None:
+                data_files["validation"] = args.validation_file
+            extension = args.validation_file.split(".")[-1]
+            raw_datasets = load_dataset(extension, data_files=data_files)
+    
+        # Preprocessing the dataset.
+        # First we tokenize all the texts.
+        column_names = raw_datasets["validation"].column_names
+        
+        # Get the language codes for input/target.
+        source_lang = config.source_lang.split("_")[0]
+        target_lang = config.target_lang.split("_")[0]
+    
+        # Temporarily set max_target_length for training.
+        max_target_length = config.max_target_length
+        padding = "max_length" if config.pad_to_max_length else False
+        
+        def preprocess_function(examples):
+                        
+            # Set input and target keys
+            if config.data_task == "definition":
+                
+                if config.input_column == "input":
+                    input_label = config.input_column
+                else:
+                    input_label = source_lang + '_' + config.input_column
+                
+                if config.target_column == "target":
+                    target_label = config.target_column
+                else:
+                    target_label = target_lang + '_' + config.target_column
+            
+            elif config.data_task == "translation":
+                input_label = source_lang
+                target_label = target_lang
+            
+            else:
+                raise KeyError("Need to specify how to handle data if data_task"
+                               "is not 'definition' or 'translation'.")
+            print(input_label, target_label)
+            inputs = [ex[input_label] for ex in examples[config.data_task]]
+            targets = [ex[target_label] for ex in examples[config.data_task]]
+            inputs = [prefix + inp for inp in inputs]
+            model_inputs = tokenizer(inputs, max_length=config.max_source_length, padding=padding, truncation=config.truncate)
+            print(len(inputs), len(targets))
+            # Setup the tokenizer for targets
+            with tokenizer.as_target_tokenizer():
+                labels = tokenizer(targets, max_length=max_target_length, padding=padding, truncation=config.truncate)
+    
+            # If we are padding here, replace all tokenizer.pad_token_id in the labels by -100 when we want to ignore
+            # padding in the loss.
+            if padding == "max_length" and config.ignore_pad_token_for_loss:
+                labels["input_ids"] = [
+                    [(l if l != tokenizer.pad_token_id else -100) for l in label] for label in labels["input_ids"]
+                ]
+    
+            model_inputs["labels"] = labels["input_ids"]
+            return model_inputs
+        
+        with accelerator.main_process_first():             
+            processed_datasets = raw_datasets.map(
+            preprocess_function,
+            batched=True,
+            num_proc=config.preprocessing_num_workers,
+            remove_columns=column_names,
+            load_from_cache_file=not config.overwrite_cache,
+            # load_from_cache_file=False,
+            desc="Running tokenizer on dataset",
+            )
+        print("Processed datasets:", len(processed_datasets))
+        if config.demarcator is not None:
+            init_length = len(processed_datasets["validation"])
+            
+            # check for both demarcators
+            demarc_id = tokenizer.convert_tokens_to_ids(config.demarcator)
+            processed_datasets = processed_datasets.filter(lambda ex:
+                                                            ex['input_ids'].count(demarc_id) == 2
+                                                            )
+            end_length = len(processed_datasets["validation"])
+            dropped = init_length - end_length
+            print(f"{dropped} examples filtered out due to definiendum getting lost in truncation.")
+            
+        
+        # Add cross-attention mask, remove definiendum span markers
+        if config.mask_context:
+            processed_datasets = processed_datasets.map(lambda x:
+                                                    prepare_for_xattn(x, tokenizer, config.demarcator, config.mask_eos),
+                                                    desc="Adding cross-attention mask")
+        
+        eval_dataset = processed_datasets["validation"]
+        print("Num eval examples: ", eval_dataset)
+    
+        
+        label_pad_token_id = -100 if config.ignore_pad_token_for_loss else tokenizer.pad_token_id
+        
+        if config.pad_to_max_length:
+            data_collator = default_data_collator
+            
+        else:
+            data_collator = DataCollatorForSeq2Seq(
+                tokenizer,
+                model=model,
+                label_pad_token_id=label_pad_token_id,
+                pad_to_multiple_of=8 if accelerator.use_fp16 else None,
+            )
+ 
+        eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=config.per_device_eval_batch_size)
+    
+        demarc_id = tokenizer.convert_tokens_to_ids(config.demarcator)
+        
+        definienda = get_batched_definienda(eval_dataloader, config.mask_context, demarc_id, tokenizer)
+        if config.ban_definienda:
+            definienda = get_batched_definienda(eval_dataloader, config.mask_context, demarc_id, tokenizer)    
+            
+        metric = load_metric("sacrebleu")
+
+        from sentence_transformers import SentenceTransformer, util
+        emb_model = SentenceTransformer('all-MiniLM-L6-v2')
+        
+        def cos_similarity(sent1, sent2):
+            """Calculate cosine similarity of two sentences"""
+            sent_embs = emb_model.encode([sent1, sent2])
+            cos = util.cos_sim(*sent_embs)
+            return round(cos.item(), 3)
+    
+        def postprocess_text(preds, labels):
+            preds = [pred.strip() for pred in preds]
+            labels = [[label.strip()] for label in labels]
+    
+            return preds, labels
+        
+        
+        # EVALUATE MODEL!
+        
+        if config.report_to == "wandb":
+    
+            tags = config.tags.split(",") if config.tags else None
+    
+            # Report hyperparameters
+            wb_config = model.config.to_dict()
+            # wb_config.update(vars(args))
+                    
+            wandb.init(
+                project=config.wandb_proj,
+                notes=config.notes,
+                tags=tags,
+                config=wb_config,
+                allow_val_change=True
+                )
+        
+        model.eval()
+        loss = 0
+        
+        print("Num eval batches:", len(eval_dataloader))
+
+        if config.val_max_target_length is None:
+            config.val_max_target_length = config.max_target_length
+
+        gen_kwargs = {
+            "max_length": args.val_max_target_length if args is not None else config.max_length,
+            "num_beams": config.num_beams,
+            "no_repeat_ngram_size": model.config.no_repeat_ngram_size,
+            "repetition_penalty": model.config.repetition_penalty,
+            "early_stopping": model.config.early_stopping,
+            }
+        batch_cos = []
+        
+        for eval_step, batch in enumerate(eval_dataloader):
+            if not eval_step == len(eval_dataloader) - 1: # Skip last batch, since it is often partial.
+                with torch.no_grad():               # Want to see full results.
+                    
+                    outputs = model(**batch)
+                    loss += outputs.loss             # Gradient accumulating
+                    
+                    outputs = accelerator.unwrap_model(model).generate(
+                        batch["input_ids"],
+                        attention_mask=batch["attention_mask"],
+                        bad_words_ids=definienda[eval_step] if config.ban_definienda else None,
+                        **gen_kwargs,
+                        return_dict_in_generate=True,
+                        output_scores=True
+                    )
+                    
+                    generated_tokens = outputs.sequences
+                    
+                    generated_tokens = accelerator.pad_across_processes(
+                        generated_tokens, dim=1, pad_index=tokenizer.pad_token_id
+                    )
+                    labels = batch["labels"]
+                    if not config.pad_to_max_length:
+                        # If we did not pad to max length, we need to pad the labels too
+                        labels = accelerator.pad_across_processes(batch["labels"], dim=1, pad_index=tokenizer.pad_token_id)
+    
+                    generated_tokens = accelerator.gather(generated_tokens).cpu().numpy()
+                    labels = accelerator.gather(labels).cpu().numpy()
+                            
+                    if config.ignore_pad_token_for_loss:
+                        # Replace -100 in the labels as we can't decode them.
+                        labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+    
+                    decoded_preds = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+                    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+    
+                    decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
+
+                    metric.add_batch(predictions=decoded_preds, references=decoded_labels)
+                    
+                    sample_cos = [cos_similarity(pred,lab[0]) for pred,lab in zip(decoded_preds, decoded_labels)]
+                    batch_cos.append(sum(sample_cos)/len(sample_cos))
+                    
+        # print("Epochs completed:", epoch+(train_step+1)/len(train_dataloader))
+        for pred in zip(decoded_preds, decoded_labels):
+            print()
+            print("Pred: ", pred[0])
+            print("Actual: ", pred[1])
+        val_loss = loss/len(eval_dataloader)
+        val_ppl = round(math.exp(val_loss),4)
+        eval_metric = metric.compute()
+        ave_cos = round(sum(batch_cos)/len(batch_cos), 4)
+        
+        logger.info({"bleu": eval_metric["score"]})
+        if config.report_to == "wandb":
+            wandb.log({
+                       #  'epoch': epoch+(train_step+1)/len(train_dataloader),
+                       # 'batch': epoch*len(train_dataloader)+train_step+1,
+                       # 'effective_batch': completed_steps,
+                       'eval/loss': val_loss,
+                       'eval/perplexity': val_ppl,
+                       'eval/bleu': eval_metric['score'],
+                       'eval/length': eval_metric['sys_len']/len(eval_dataloader),
+                       'eval/cos_sim': ave_cos
+                       })
+    
+    
+    
+    elif args.generate:
         
         import regex as re
         
