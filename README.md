@@ -1,4 +1,4 @@
-# XLdefgen
+# XLdefgen [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/brandonwilde/XLdefgen)
 ### A framework for the automatic generation of cross-lingual definitions.
 
 Read the full paper "Cross-Lingual Definition Generation from an mT5" included as a PDF in this repo.
